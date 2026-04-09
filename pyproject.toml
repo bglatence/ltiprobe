@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "ping-tool"
+version = "0.1.0"
+description = "Mesure les temps de reponse HTTP de sites web"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = []
+
+[project.scripts]
+ping-tool = "ping_tool.main:main"

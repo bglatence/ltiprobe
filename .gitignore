@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Environnements virtuels
+venv/
+.env/
+
+# VS Code
+.vscode/
+
+# Fichiers generés par le programme
+resultats_*.csv

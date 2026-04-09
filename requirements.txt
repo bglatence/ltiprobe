@@ -1,0 +1,3 @@
+# Dependances du projet
+# (vide - uniquement des modules Python standard)
+pytest>=7.0  # pour les tests
