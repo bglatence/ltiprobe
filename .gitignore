@@ -14,4 +14,4 @@ venv/
 .vscode/
 
 # Fichiers generés par le programme
-resultats_*.csv
+resultats_*.csv*.egg-info/
