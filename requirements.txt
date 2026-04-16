@@ -1,3 +1,8 @@
-# Dependances du projet
-# (vide - uniquement des modules Python standard)
-pytest>=7.0  # pour les tests
+iniconfig==2.3.0
+packaging==26.0
+-e git+https://github.com/bglatence/ping-tool.git@39d52d5ec7ddfc02007ecd9aeab78c7ed1f3f3e7#egg=ping_tool
+pluggy==1.6.0
+Pygments==2.20.0
+pytest==9.0.3
+setuptools==82.0.1
+tqdm==4.67.3
