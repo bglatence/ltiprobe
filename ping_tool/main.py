@@ -68,7 +68,7 @@ def main():
             total=args.nombre,
             desc=site,
             unit="ping",
-            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]"
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]", colour='yellow'
         ) as barre:
             for _ in range(args.nombre):
                 r = mesurer_site(site, nb_mesures=1, timeout=args.timeout)
