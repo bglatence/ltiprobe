@@ -1,0 +1,38 @@
+name: Tests ping-tool
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Mettre a jour pip
+        run: python -m pip install --upgrade pip
+
+      - name: Installer les dependances
+        run: |
+          pip install -r requirements.txt
+          pip install tqdm
+          pip install -e .
+
+      - name: Lancer pytest
+        run: pytest -v
+
+      - name: Verifier que la commande ping-tool fonctionne
+        run: ping-tool --version
