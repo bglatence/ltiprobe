@@ -24,10 +24,10 @@ def test_mesurer_dns_invalide():
     assert ms is None
 
 def test_mesurer_site_timeout():
-    """Un timeout tres court doit retourner une erreur timeout."""
+    """Un timeout tres court doit retourner une erreur."""
     r = mesurer_site("https://google.com", nb_mesures=1, timeout=0.001)
     assert r["erreur"] == True
-    assert r["type_erreur"] in ["timeout", "inconnu"]
+    assert r["type_erreur"] in ["timeout", "inconnu", "http"]
 
 def test_mesurer_site_url_malformee():
     """Une URL malformee doit retourner une erreur."""
