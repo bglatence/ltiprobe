@@ -28,11 +28,15 @@ jobs:
       - name: Installer les dependances
         run: |
           pip install -r requirements.txt
-          pip install tqdm
           pip install -e .
+
+      - name: Nettoyer les caches Python
+        run: |
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -name "*.pyc" -delete 2>/dev/null || true
 
       - name: Lancer pytest
         run: pytest -v
 
-      - name: Verifier que la commande ping-tool fonctionne
+      - name: Verifier ping-tool
         run: ping-tool --version
