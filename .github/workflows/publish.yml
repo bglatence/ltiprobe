@@ -30,6 +30,12 @@ jobs:
           pip install --upgrade pip
           pip install build twine
 
+      - name: Verifier la version dans pyproject.toml
+        run: |
+          VERSION=$(python -c "import tomllib; f=open('pyproject.toml','rb'); d=tomllib.load(f); print(d['project']['version'])")
+          echo "Version du package : $VERSION"
+          echo "PACKAGE_VERSION=$VERSION" >> $GITHUB_ENV
+
       - name: Construire le package
         run: python -m build
 
@@ -41,13 +47,19 @@ jobs:
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        run: |
-          twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+        run: twine upload --repository-url https://test.pypi.org/legacy/ dist/*
 
       - name: Publier sur PyPI
         if: github.event.inputs.destination == 'pypi'
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: twine upload dist/*
+
+      - name: Creer le tag Git
+        if: github.event.inputs.destination == 'pypi'
         run: |
-          twine upload dist/*
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag v${{ env.PACKAGE_VERSION }}
+          git push origin v${{ env.PACKAGE_VERSION }}
