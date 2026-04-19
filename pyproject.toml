@@ -3,12 +3,23 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ping-tool"
+name = "ping-tool-bglatence"
 version = "0.1.0"
-description = "Mesure les temps de reponse HTTP de sites web"
+description = "Mesure les temps de reponse HTTP et DNS de sites web"
 readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.8"
 dependencies = ["tqdm>=4.0"]
+keywords = ["ping", "http", "dns", "network", "latency"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/bglatence/ping-tool"
+Issues = "https://github.com/bglatence/ping-tool/issues"
 
 [project.scripts]
 ping-tool = "ping_tool.main:main"
