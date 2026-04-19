@@ -5,6 +5,8 @@ SITES_DEFAUT = [
     "https://google.com",
     "https://github.com",
     "https://youtube.com",
+    "https://canada.ca",
+    "https://apple.com"
 ]
 
 # Nombre de mesures par site
