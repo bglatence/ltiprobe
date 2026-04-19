@@ -33,3 +33,5 @@ pip install ping-tool-bglatence
 ## Licence
 
 MIT
+
+[![PyPI version](https://badge.fury.io/py/ping-tool-bglatence.svg)](https://pypi.org/project/ping-tool-bglatence/)
