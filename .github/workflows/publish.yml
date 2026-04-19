@@ -1,0 +1,53 @@
+name: Publier sur PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      destination:
+        description: "Où publier ?"
+        required: true
+        default: "testpypi"
+        type: choice
+        options:
+          - testpypi
+          - pypi
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@v5
+
+      - name: Installer Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Installer les outils de build
+        run: |
+          pip install --upgrade pip
+          pip install build twine
+
+      - name: Construire le package
+        run: python -m build
+
+      - name: Verifier le package
+        run: twine check dist/*
+
+      - name: Publier sur TestPyPI
+        if: github.event.inputs.destination == 'testpypi'
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        run: |
+          twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+
+      - name: Publier sur PyPI
+        if: github.event.inputs.destination == 'pypi'
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          twine upload dist/*
