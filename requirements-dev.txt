@@ -1,0 +1,6 @@
+pytest>=7.0
+pytest-mock>=3.0
+ruff>=0.4
+mypy>=1.0
+types-tqdm
+bandit>=1.7
