@@ -22,11 +22,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Mettre a jour pip
-        run: python -m pip install --upgrade pip
-
       - name: Installer les dependances
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -e .
 
@@ -34,6 +32,12 @@ jobs:
         run: |
           find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find . -name "*.pyc" -delete 2>/dev/null || true
+
+      - name: Ruff — verification style
+        run: ruff check .
+
+      - name: Mypy — verification types
+        run: mypy ping_tool/ --ignore-missing-imports
 
       - name: Lancer pytest
         run: pytest -v
