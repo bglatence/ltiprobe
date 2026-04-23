@@ -34,14 +34,14 @@ jobs:
           find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find . -name "*.pyc" -delete 2>/dev/null || true
 
-      - name: Debug — structure du projet
-        run: |
-          echo "=== Fichiers test_core.py ==="
-          find . -name "test_core.py" | grep -v venv
-          echo "=== Racine du projet ==="
-          ls -la
-          echo "=== Dossiers ==="
-          find . -maxdepth 2 -type d | grep -v venv | grep -v ".git"
+      # - name: Debug — structure du projet
+      #   run: |
+      #     echo "=== Fichiers test_core.py ==="
+      #     find . -name "test_core.py" | grep -v venv
+      #     echo "=== Racine du projet ==="
+      #     ls -la
+      #     echo "=== Dossiers ==="
+      #     find . -maxdepth 2 -type d | grep -v venv | grep -v ".git"
 
       - name: Ruff — verification style
         run: ruff check .
