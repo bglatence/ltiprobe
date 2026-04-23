@@ -30,12 +30,3 @@ include = ["ping_tool*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-
-[tool.ruff]
-exclude = [
-    "src/",
-    "venv/",
-    ".git/",
-    "__pycache__",
-    "*.egg-info",
-]
