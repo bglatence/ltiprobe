@@ -5,7 +5,7 @@ import os
 def test_mesurer_site_valide():
     """Un site valide doit retourner HTTP et DNS."""
     r = mesurer_site("https://google.com", nb_mesures=1)
-    assert r["erreur"] == False
+    assert not r["erreur"]
     assert r["moyenne"] > 0
     assert r["dns_moyenne"] > 0
     assert r["dns_moyenne"] < r["moyenne"]  # DNS doit être plus rapide que HTTP
@@ -26,13 +26,13 @@ def test_mesurer_dns_invalide():
 def test_mesurer_site_timeout():
     """Un timeout tres court doit retourner une erreur."""
     r = mesurer_site("https://google.com", nb_mesures=1, timeout=0.001)
-    assert r["erreur"] == True
+    assert r["erreur"]
     assert r["type_erreur"] in ["timeout", "inconnu", "http"]
 
 def test_mesurer_site_url_malformee():
     """Une URL malformee doit retourner une erreur."""
     r = mesurer_site("pas-une-url", nb_mesures=1)
-    assert r["erreur"] == True
+    assert r["erreur"]
 
 def test_sauvegarder_csv(tmp_path):
     """Le CSV doit etre cree avec les bonnes colonnes."""
