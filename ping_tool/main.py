@@ -4,6 +4,7 @@ import sys
 import threading
 from tqdm import tqdm
 from ping_tool import config
+from ping_tool.i18n import get_translator
 from ping_tool.core import (
     mesurer_site, sauvegarder_csv,
     creer_histogramme, hdr_enregistrer, hdr_stats,
@@ -18,6 +19,8 @@ VERT   = _ansi("92")
 ORANGE = _ansi("33")
 ROUGE  = _ansi("91")
 RESET  = _ansi("0")
+
+t = get_translator(config.LANGUE)
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -54,58 +57,51 @@ def parse_arguments():
     return parser.parse_args()
 
 def indicateur_stabilite(p50, p99):
-    """Evalue la stabilite a partir du ratio p99/p50."""
     if p50 <= 0:
         return "n/a"
     ratio = p99 / p50
-    ratio_str = "(p99/p50 = " + str(round(ratio, 1)) + "x)"
+    ratio_str = t("ratio", r=round(ratio, 1))
     if ratio < 2:
-        return VERT  + "tres stable  " + ratio_str + RESET
+        return VERT   + t("tres_stable") + ratio_str + RESET
     if ratio < 5:
-        return VERT  + "stable       " + ratio_str + RESET
+        return VERT   + t("stable")      + ratio_str + RESET
     if ratio < 10:
-        return ORANGE + "variable     " + ratio_str + RESET
-    return ROUGE + "instable     " + ratio_str + RESET
+        return ORANGE + t("variable")    + ratio_str + RESET
+    return ROUGE  + t("instable")    + ratio_str + RESET
 
 def _slo_tag(slo_checks, cle_slo):
-    """Retourne le tag SLO inline pour une clé, ou chaîne vide si absent."""
     if not slo_checks or cle_slo not in slo_checks:
         return ""
     c = slo_checks[cle_slo]
     if c["ok"]:
-        return "  [SLO <=" + str(c["seuil"]) + "ms  " + VERT + "OK" + RESET + "]"
-    return "  [SLO <=" + str(c["seuil"]) + "ms  " + ROUGE + "VIOLATION" + RESET + "]"
+        return t("slo_tag_ok",  s=c["seuil"], ok=VERT,  reset=RESET)
+    return t("slo_tag_nok", s=c["seuil"], rouge=ROUGE, reset=RESET)
 
 def _delta(a, b):
-    """Retourne '+X ms' si b > a, sinon chaîne vide."""
     if a is None or b is None or a <= 0:
         return ""
     d = round(b - a, 1)
     return ("  (+" + str(d) + " ms)") if d > 0 else ""
 
 def afficher_protocoles(icmp, tcp, http_p50, site):
-    """Affiche la comparaison en couches ICMP / TCP / HTTP."""
     port = tcp["port"] if tcp else 443
     icmp_moy = icmp["moyenne"] if icmp else None
     tcp_moy  = tcp["moyenne"]  if tcp  else None
 
-    print("  --- Comparaison protocoles ---")
+    print(t("proto_titre"))
     if icmp:
-        print("  ICMP  (réseau)     : " + str(icmp_moy) + " ms"
-              + "  min: " + str(icmp["min"]) + "  max: " + str(icmp["max"])
-              + "  (" + str(icmp["nb"]) + " paquets)")
+        print(t("proto_icmp", v=icmp_moy, min=icmp["min"], max=icmp["max"], n=icmp["nb"]))
     else:
-        print("  ICMP  (réseau)     : non disponible")
+        print(t("proto_icmp_na"))
 
     if tcp:
-        print("  TCP   (port " + str(port) + ")   : " + str(tcp_moy) + " ms"
-              + "  min: " + str(tcp["min"]) + "  max: " + str(tcp["max"])
+        print(t("proto_tcp", p=port, v=tcp_moy, min=tcp["min"], max=tcp["max"])
               + _delta(icmp_moy, tcp_moy))
     else:
-        print("  TCP   (port " + str(port) + ")   : non disponible")
+        print(t("proto_tcp_na", p=port))
 
     if http_p50:
-        print("  HTTP  (p50)        : " + str(http_p50) + " ms"
+        print(t("proto_http", v=http_p50)
               + _delta(tcp_moy if tcp_moy else icmp_moy, http_p50))
 
 def afficher_resultat(r, slo_checks=None):
@@ -114,26 +110,24 @@ def afficher_resultat(r, slo_checks=None):
         return
 
     print(r["url"])
-    print("  HTTP  distribution (" + str(r.get("nb_mesures", "?")) + " mesures)")
-    print("    moyenne : " + str(r["moyenne"]) + " ms"
-          + "   min: " + str(r["min"]) + "   max: " + str(r["max"]))
-    print("    p50     : " + str(r["p50"])  + " ms" + _slo_tag(slo_checks, "http_p50_ms"))
-    print("    p75     : " + str(r["p75"])  + " ms" + _slo_tag(slo_checks, "http_p75_ms"))
-    print("    p90     : " + str(r["p90"])  + " ms" + _slo_tag(slo_checks, "http_p90_ms"))
-    print("    p95     : " + str(r["p95"])  + " ms" + _slo_tag(slo_checks, "http_p95_ms"))
-    print("    p99     : " + str(r["p99"])  + " ms" + _slo_tag(slo_checks, "http_p99_ms"))
-    print("    p99.9   : " + str(r["p999"]) + " ms" + _slo_tag(slo_checks, "http_p999_ms"))
-    print("  Stabilite : " + indicateur_stabilite(r["p50"], r["p99"]))
-    print("  DNS   -> moyenne: " + str(r["dns_moyenne"]) + " ms"
-          + "  min: " + str(r["dns_min"]) + "  max: " + str(r["dns_max"])
+    print(t("http_dist", n=r.get("nb_mesures", "?")))
+    print(t("moyenne", v=r["moyenne"], min=r["min"], max=r["max"]))
+    print(t("p50",  v=r["p50"])  + _slo_tag(slo_checks, "http_p50_ms"))
+    print(t("p75",  v=r["p75"])  + _slo_tag(slo_checks, "http_p75_ms"))
+    print(t("p90",  v=r["p90"])  + _slo_tag(slo_checks, "http_p90_ms"))
+    print(t("p95",  v=r["p95"])  + _slo_tag(slo_checks, "http_p95_ms"))
+    print(t("p99",  v=r["p99"])  + _slo_tag(slo_checks, "http_p99_ms"))
+    print(t("p999", v=r["p999"]) + _slo_tag(slo_checks, "http_p999_ms"))
+    print(t("stabilite") + indicateur_stabilite(r["p50"], r["p99"]))
+    print(t("dns", v=r["dns_moyenne"], min=r["dns_min"], max=r["dns_max"])
           + _slo_tag(slo_checks, "dns_ms"))
 
     if slo_checks:
         nb_violations = sum(1 for c in slo_checks.values() if not c["ok"])
         if nb_violations == 0:
-            print("  SLO   -> " + VERT + "tous les objectifs sont respectes" + RESET)
+            print(VERT + t("slo_ok") + RESET)
         else:
-            print("  SLO   -> " + ROUGE + str(nb_violations) + " violation(s)" + RESET)
+            print(ROUGE + t("slo_violation", n=nb_violations) + RESET)
     if "icmp" in r or "tcp" in r:
         afficher_protocoles(r.get("icmp"), r.get("tcp"), r.get("p50"), r["url"])
     print("")
@@ -141,7 +135,6 @@ def afficher_resultat(r, slo_checks=None):
 def main():
     args = parse_arguments()
 
-    # Les sites passés en CLI (strings) n'ont pas de SLO
     if args.sites:
         sites_config = [{"url": s} for s in args.sites]
     else:
@@ -150,7 +143,7 @@ def main():
             for s in config.SITES_DEFAUT
         ]
 
-    print("Mesure des temps de reponse (" + str(args.nombre) + " essais)...\n")
+    print(t("header", n=args.nombre) + "\n")
 
     resultats = []
 
@@ -225,7 +218,7 @@ def main():
 
     if args.csv and resultats:
         fichier = sauvegarder_csv(resultats)
-        print("Resultats sauvegardes dans : " + fichier)
+        print(t("csv_sauvegarde", f=fichier))
 
 if __name__ == "__main__":
     main()

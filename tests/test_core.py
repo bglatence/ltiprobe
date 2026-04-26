@@ -1,6 +1,28 @@
 # -*- coding: utf-8 -*-
 from ping_tool.core import mesurer_site, sauvegarder_csv, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo
+from ping_tool.i18n import get_translator
 import os
+
+
+def test_i18n_fr_header():
+    """Le traducteur FR doit produire un message en français."""
+    t = get_translator("FR")
+    assert "essais" in t("header", n=5)
+
+def test_i18n_en_header():
+    """Le traducteur EN doit produire un message en anglais."""
+    t = get_translator("EN")
+    assert "attempts" in t("header", n=5)
+
+def test_i18n_langue_inconnue_repli_fr():
+    """Une langue inconnue doit utiliser le français par défaut."""
+    t = get_translator("ZZ")
+    assert "essais" in t("header", n=5)
+
+def test_i18n_cles_identiques():
+    """FR et EN doivent avoir exactement les mêmes clés."""
+    from ping_tool.i18n import _TRANSLATIONS
+    assert set(_TRANSLATIONS["FR"].keys()) == set(_TRANSLATIONS["EN"].keys())
 
 def test_hdr_stats_percentiles_croissants():
     """Les percentiles doivent être croissants."""
