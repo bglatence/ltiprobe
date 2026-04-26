@@ -2,7 +2,11 @@
 import argparse
 from tqdm import tqdm
 from ping_tool import config
-from ping_tool.core import mesurer_site, sauvegarder_csv, creer_histogramme, hdr_enregistrer, hdr_stats
+from ping_tool.core import (
+    mesurer_site, sauvegarder_csv,
+    creer_histogramme, hdr_enregistrer, hdr_stats,
+    verifier_slo,
+)
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -12,7 +16,7 @@ def parse_arguments():
     parser.add_argument(
         "--version",
         action="version",
-        version="ping-tool 0.2.0"
+        version="ping-tool 0.2.1"
     )
     parser.add_argument(
         "sites",
@@ -51,36 +55,62 @@ def indicateur_stabilite(p50, p99):
         return "variable     (p99/p50 = " + str(round(ratio, 1)) + "x)"
     return "instable     (p99/p50 = " + str(round(ratio, 1)) + "x)"
 
-def afficher_resultat(r):
+def _slo_tag(slo_checks, cle_slo):
+    """Retourne le tag SLO inline pour une clé, ou chaîne vide si absent."""
+    if not slo_checks or cle_slo not in slo_checks:
+        return ""
+    c = slo_checks[cle_slo]
+    statut = "OK" if c["ok"] else "VIOLATION"
+    return "  [SLO <=" + str(c["seuil"]) + "ms  " + statut + "]"
+
+def afficher_resultat(r, slo_checks=None):
     if r["erreur"]:
         print(r["url"] + " -> " + r["message"])
-    else:
-        print(r["url"])
-        print("  HTTP  distribution (" + str(r.get("nb_mesures", "?")) + " mesures)")
-        print("    moyenne : " + str(r["moyenne"]) + " ms"
-              + "   min: " + str(r["min"]) + "   max: " + str(r["max"]))
-        print("    p50     : " + str(r["p50"])  + " ms")
-        print("    p75     : " + str(r["p75"])  + " ms")
-        print("    p90     : " + str(r["p90"])  + " ms")
-        print("    p95     : " + str(r["p95"])  + " ms")
-        print("    p99     : " + str(r["p99"])  + " ms")
-        print("    p99.9   : " + str(r["p999"]) + " ms")
-        print("  Stabilite : " + indicateur_stabilite(r["p50"], r["p99"]))
-        print("  DNS   -> moyenne: " + str(r["dns_moyenne"]) + " ms"
-              + "  min: " + str(r["dns_min"]) + "  max: " + str(r["dns_max"]))
-        print("  DNS % -> " + str(round(r["dns_moyenne"] / r["moyenne"] * 100, 1))
-              + "% du temps total")
-        print("")
+        return
+
+    print(r["url"])
+    print("  HTTP  distribution (" + str(r.get("nb_mesures", "?")) + " mesures)")
+    print("    moyenne : " + str(r["moyenne"]) + " ms"
+          + "   min: " + str(r["min"]) + "   max: " + str(r["max"]))
+    print("    p50     : " + str(r["p50"])  + " ms" + _slo_tag(slo_checks, "http_p50_ms"))
+    print("    p75     : " + str(r["p75"])  + " ms" + _slo_tag(slo_checks, "http_p75_ms"))
+    print("    p90     : " + str(r["p90"])  + " ms" + _slo_tag(slo_checks, "http_p90_ms"))
+    print("    p95     : " + str(r["p95"])  + " ms" + _slo_tag(slo_checks, "http_p95_ms"))
+    print("    p99     : " + str(r["p99"])  + " ms" + _slo_tag(slo_checks, "http_p99_ms"))
+    print("    p99.9   : " + str(r["p999"]) + " ms" + _slo_tag(slo_checks, "http_p999_ms"))
+    print("  Stabilite : " + indicateur_stabilite(r["p50"], r["p99"]))
+    print("  DNS   -> moyenne: " + str(r["dns_moyenne"]) + " ms"
+          + "  min: " + str(r["dns_min"]) + "  max: " + str(r["dns_max"])
+          + _slo_tag(slo_checks, "dns_ms"))
+
+    if slo_checks:
+        nb_violations = sum(1 for c in slo_checks.values() if not c["ok"])
+        if nb_violations == 0:
+            print("  SLO   -> tous les objectifs sont respectes")
+        else:
+            print("  SLO   -> " + str(nb_violations) + " violation(s)")
+    print("")
 
 def main():
     args = parse_arguments()
-    sites = args.sites if args.sites else config.SITES_DEFAUT
+
+    # Normalisation : les sites CLI (strings) n'ont pas de SLO
+    if args.sites:
+        sites_config = [{"url": s} for s in args.sites]
+    else:
+        sites_config = [
+            s if isinstance(s, dict) else {"url": s}
+            for s in config.SITES_DEFAUT
+        ]
 
     print("Mesure des temps de reponse (" + str(args.nombre) + " essais)...\n")
 
     resultats = []
 
-    for site in sites:
+    for site_cfg in sites_config:
+        site = site_cfg["url"]
+        slo  = site_cfg.get("slo")
+
         hist_http = creer_histogramme()
         mesures_dns = []
         erreur = None
@@ -119,8 +149,12 @@ def main():
                 "dns_min":     min(mesures_dns),
                 "dns_max":     max(mesures_dns),
             }
+
+            slo_checks = verifier_slo(resultat_final, slo) if slo else None
+            resultat_final["slo_checks"] = slo_checks
+
             resultats.append(resultat_final)
-            afficher_resultat(resultat_final)
+            afficher_resultat(resultat_final, slo_checks)
 
     if args.csv and resultats:
         fichier = sauvegarder_csv(resultats)
