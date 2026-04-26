@@ -8,7 +8,7 @@ from ping_tool.i18n import get_translator
 from ping_tool.core import (
     mesurer_site, sauvegarder_csv,
     creer_histogramme, hdr_enregistrer, hdr_stats,
-    verifier_slo, mesurer_icmp, mesurer_tcp,
+    verifier_slo, mesurer_icmp, mesurer_tcp, mesurer_tls,
 )
 
 # Codes ANSI — désactivés si la sortie n'est pas un terminal (fichier, CI)
@@ -83,10 +83,11 @@ def _delta(a, b):
     d = round(b - a, 1)
     return ("  (+" + str(d) + " ms)") if d > 0 else ""
 
-def afficher_protocoles(icmp, tcp, http_p50, site):
-    port = tcp["port"] if tcp else 443
+def afficher_protocoles(icmp, tcp, tls, http_p50, site):
+    port     = tcp["port"] if tcp else 443
     icmp_moy = icmp["moyenne"] if icmp else None
     tcp_moy  = tcp["moyenne"]  if tcp  else None
+    tls_moy  = tls["moyenne"]  if tls  else None
 
     print(t("proto_titre"))
     if icmp:
@@ -100,9 +101,15 @@ def afficher_protocoles(icmp, tcp, http_p50, site):
     else:
         print(t("proto_tcp_na", p=port))
 
+    if tls:
+        print(t("proto_tls", v=tls_moy, min=tls["min"], max=tls["max"])
+              + _delta(tcp_moy if tcp_moy else icmp_moy, tls_moy))
+    elif site.startswith("https://"):
+        print(t("proto_tls_na"))
+
     if http_p50:
-        print(t("proto_http", v=http_p50)
-              + _delta(tcp_moy if tcp_moy else icmp_moy, http_p50))
+        prev = tls_moy or tcp_moy or icmp_moy
+        print(t("proto_http", v=http_p50) + _delta(prev, http_p50))
 
 def afficher_resultat(r, slo_checks=None):
     if r["erreur"]:
@@ -128,8 +135,8 @@ def afficher_resultat(r, slo_checks=None):
             print(VERT + t("slo_ok") + RESET)
         else:
             print(ROUGE + t("slo_violation", n=nb_violations) + RESET)
-    if "icmp" in r or "tcp" in r:
-        afficher_protocoles(r.get("icmp"), r.get("tcp"), r.get("p50"), r["url"])
+    if "icmp" in r or "tcp" in r or "tls" in r:
+        afficher_protocoles(r.get("icmp"), r.get("tcp"), r.get("tls"), r.get("p50"), r["url"])
     print("")
 
 def main():
@@ -156,8 +163,11 @@ def main():
         erreur = None
         icmp_result = {}
         tcp_result  = {}
+        tls_result  = {}
 
         hostname = site.split("//")[-1].split("/")[0]
+        is_https = site.startswith("https://")
+
         icmp_thread = threading.Thread(
             target=lambda: icmp_result.update(
                 {"icmp": mesurer_icmp(hostname, nb_mesures=args.nombre)}
@@ -168,8 +178,15 @@ def main():
                 {"tcp": mesurer_tcp(site, nb_mesures=args.nombre)}
             )
         )
+        tls_thread = threading.Thread(
+            target=lambda: tls_result.update(
+                {"tls": mesurer_tls(site, nb_mesures=args.nombre, timeout=args.timeout)}
+            )
+        )
         icmp_thread.start()
         tcp_thread.start()
+        if is_https:
+            tls_thread.start()
 
         with tqdm(
             total=args.nombre,
@@ -190,6 +207,8 @@ def main():
 
         icmp_thread.join()
         tcp_thread.join()
+        if is_https:
+            tls_thread.join()
 
         if erreur:
             resultats.append(erreur)
@@ -209,6 +228,7 @@ def main():
                 "dns_max":     max(mesures_dns),
                 "icmp":        icmp_result.get("icmp"),
                 "tcp":         tcp_result.get("tcp"),
+                "tls":         tls_result.get("tls") if is_https else None,
             }
             slo_checks = verifier_slo(resultat_final, slo) if slo else None
             resultat_final["slo_checks"] = slo_checks
