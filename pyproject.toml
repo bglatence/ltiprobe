@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ping-tool-bglatence"
-version = "0.1.5"
+version = "0.2.0"
 description = "Mesure les temps de reponse HTTP et DNS de sites web"
 readme = "README.md"
 license = { text = "MIT" }
