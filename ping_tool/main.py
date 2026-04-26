@@ -109,7 +109,13 @@ def afficher_protocoles(icmp, tcp, tls, http_p50, site):
 
     if http_p50:
         prev = tls_moy or tcp_moy or icmp_moy
-        print(t("proto_http", v=http_p50) + _delta(prev, http_p50))
+        print(t("proto_http_froid", v=http_p50) + _delta(prev, http_p50))
+
+        # Estimation keep-alive : HTTP froid moins les surcharges TCP et TLS
+        surcharge = round((tcp_moy or 0) + (tls_moy or 0), 1)
+        http_chaud = round(http_p50 - surcharge, 1)
+        if surcharge > 0 and http_chaud > 0:
+            print(t("proto_http_chaud", v=http_chaud))
 
 def afficher_resultat(r, slo_checks=None):
     if r["erreur"]:
