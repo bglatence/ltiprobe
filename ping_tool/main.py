@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import argparse
+import sys
 from tqdm import tqdm
 from ping_tool import config
 from ping_tool.core import (
@@ -7,6 +8,15 @@ from ping_tool.core import (
     creer_histogramme, hdr_enregistrer, hdr_stats,
     verifier_slo,
 )
+
+# Codes ANSI — désactivés si la sortie n'est pas un terminal (fichier, CI)
+def _ansi(code):
+    return "\033[" + code + "m" if sys.stdout.isatty() else ""
+
+VERT   = _ansi("92")
+ORANGE = _ansi("33")
+ROUGE  = _ansi("91")
+RESET  = _ansi("0")
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -47,21 +57,23 @@ def indicateur_stabilite(p50, p99):
     if p50 <= 0:
         return "n/a"
     ratio = p99 / p50
+    ratio_str = "(p99/p50 = " + str(round(ratio, 1)) + "x)"
     if ratio < 2:
-        return "tres stable  (p99/p50 = " + str(round(ratio, 1)) + "x)"
+        return VERT  + "tres stable  " + ratio_str + RESET
     if ratio < 5:
-        return "stable       (p99/p50 = " + str(round(ratio, 1)) + "x)"
+        return VERT  + "stable       " + ratio_str + RESET
     if ratio < 10:
-        return "variable     (p99/p50 = " + str(round(ratio, 1)) + "x)"
-    return "instable     (p99/p50 = " + str(round(ratio, 1)) + "x)"
+        return ORANGE + "variable     " + ratio_str + RESET
+    return ROUGE + "instable     " + ratio_str + RESET
 
 def _slo_tag(slo_checks, cle_slo):
     """Retourne le tag SLO inline pour une clé, ou chaîne vide si absent."""
     if not slo_checks or cle_slo not in slo_checks:
         return ""
     c = slo_checks[cle_slo]
-    statut = "OK" if c["ok"] else "VIOLATION"
-    return "  [SLO <=" + str(c["seuil"]) + "ms  " + statut + "]"
+    if c["ok"]:
+        return "  [SLO <=" + str(c["seuil"]) + "ms  " + VERT + "OK" + RESET + "]"
+    return "  [SLO <=" + str(c["seuil"]) + "ms  " + ROUGE + "VIOLATION" + RESET + "]"
 
 def afficher_resultat(r, slo_checks=None):
     if r["erreur"]:
@@ -86,9 +98,9 @@ def afficher_resultat(r, slo_checks=None):
     if slo_checks:
         nb_violations = sum(1 for c in slo_checks.values() if not c["ok"])
         if nb_violations == 0:
-            print("  SLO   -> tous les objectifs sont respectes")
+            print("  SLO   -> " + VERT + "tous les objectifs sont respectes" + RESET)
         else:
-            print("  SLO   -> " + str(nb_violations) + " violation(s)")
+            print("  SLO   -> " + ROUGE + str(nb_violations) + " violation(s)" + RESET)
     print("")
 
 def main():
