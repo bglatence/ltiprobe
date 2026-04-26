@@ -2,6 +2,8 @@
 import urllib.request
 import urllib.error
 import socket
+import subprocess
+import re
 import time
 import csv
 from datetime import datetime
@@ -63,6 +65,38 @@ def verifier_slo(resultat, slo):
             "ok":     valeur <= seuil,
         }
     return checks
+
+def mesurer_icmp(hostname, nb_mesures=5):
+    """Mesure la latence ICMP via la commande ping système.
+
+    Retourne un dict {moyenne, min, max, p50, nb} en ms,
+    ou None si ICMP est bloqué ou indisponible.
+    """
+    try:
+        result = subprocess.run(
+            ["ping", "-c", str(nb_mesures), hostname],
+            capture_output=True, text=True, timeout=nb_mesures * 3 + 5
+        )
+        rtts = [
+            float(m.group(1))
+            for line in result.stdout.splitlines()
+            for m in [re.search(r"time[=<](\d+\.?\d*)\s*ms", line)]
+            if m
+        ]
+        if not rtts:
+            return None
+        hist = creer_histogramme()
+        for rtt in rtts:
+            hdr_enregistrer(hist, rtt)
+        return {
+            "moyenne": round(sum(rtts) / len(rtts), 2),
+            "min":     round(min(rtts), 2),
+            "max":     round(max(rtts), 2),
+            "p50":     round(hist.get_value_at_percentile(50) / 1000, 2),
+            "nb":      len(rtts),
+        }
+    except Exception:
+        return None
 
 def mesurer_dns(hostname):
     """Mesure uniquement le temps de resolution DNS. Retourne ms ou None."""

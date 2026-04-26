@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 import argparse
 import sys
+import threading
 from tqdm import tqdm
 from ping_tool import config
 from ping_tool.core import (
     mesurer_site, sauvegarder_csv,
     creer_histogramme, hdr_enregistrer, hdr_stats,
-    verifier_slo,
+    verifier_slo, mesurer_icmp,
 )
 
 # Codes ANSI — désactivés si la sortie n'est pas un terminal (fichier, CI)
@@ -75,6 +76,21 @@ def _slo_tag(slo_checks, cle_slo):
         return "  [SLO <=" + str(c["seuil"]) + "ms  " + VERT + "OK" + RESET + "]"
     return "  [SLO <=" + str(c["seuil"]) + "ms  " + ROUGE + "VIOLATION" + RESET + "]"
 
+def afficher_icmp(icmp, http_p50):
+    """Affiche les résultats ICMP et la comparaison avec HTTP p50."""
+    if icmp is None:
+        print("  ICMP  -> non disponible (bloqué ou hôte inaccessible)")
+        return
+    print("  ICMP  -> moyenne: " + str(icmp["moyenne"]) + " ms"
+          + "  min: " + str(icmp["min"])
+          + "  max: " + str(icmp["max"])
+          + "  (" + str(icmp["nb"]) + " paquets)")
+    if http_p50 and http_p50 > 0 and icmp["moyenne"] > 0:
+        ratio = round(http_p50 / icmp["moyenne"], 1)
+        surcharge = round(http_p50 - icmp["moyenne"], 1)
+        print("  HTTP vs ICMP -> HTTP p50 est " + str(ratio) + "x plus lent"
+              + "  (surcharge TCP+TLS+serveur : +" + str(surcharge) + " ms)")
+
 def afficher_resultat(r, slo_checks=None):
     if r["erreur"]:
         print(r["url"] + " -> " + r["message"])
@@ -101,6 +117,8 @@ def afficher_resultat(r, slo_checks=None):
             print("  SLO   -> " + VERT + "tous les objectifs sont respectes" + RESET)
         else:
             print("  SLO   -> " + ROUGE + str(nb_violations) + " violation(s)" + RESET)
+    if "icmp" in r:
+        afficher_icmp(r["icmp"], r.get("p50"))
     print("")
 
 def main():
@@ -126,6 +144,15 @@ def main():
         hist_http = creer_histogramme()
         mesures_dns = []
         erreur = None
+        icmp_result = {}
+
+        hostname = site.split("//")[-1].split("/")[0]
+        icmp_thread = threading.Thread(
+            target=lambda: icmp_result.update(
+                {"icmp": mesurer_icmp(hostname, nb_mesures=args.nombre)}
+            )
+        )
+        icmp_thread.start()
 
         with tqdm(
             total=args.nombre,
@@ -144,6 +171,8 @@ def main():
                 mesures_dns.append(r["dns_moyenne"])
                 barre.update(1)
 
+        icmp_thread.join()
+
         if erreur:
             resultats.append(erreur)
             continue
@@ -160,6 +189,7 @@ def main():
                 "dns_moyenne": round(sum(mesures_dns) / len(mesures_dns), 2),
                 "dns_min":     min(mesures_dns),
                 "dns_max":     max(mesures_dns),
+                "icmp":        icmp_result.get("icmp"),
             }
             slo_checks = verifier_slo(resultat_final, slo) if slo else None
             resultat_final["slo_checks"] = slo_checks
