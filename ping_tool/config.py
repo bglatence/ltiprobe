@@ -5,12 +5,11 @@ SITES_DEFAUT = [
     "https://google.com",
     "https://github.com",
     "https://youtube.com",
-    "https://canada.ca",
     "https://apple.com"
 ]
 
 # Nombre de mesures par site
-NB_MESURES = 3
+NB_MESURES = 10
 
 # Timeout en secondes
 TIMEOUT = 10
