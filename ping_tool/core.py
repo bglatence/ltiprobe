@@ -5,7 +5,23 @@ import socket
 import time
 import csv
 from datetime import datetime
+from hdrh.histogram import HdrHistogram
 from . import config
+
+# Plage 1µs–60s, 3 chiffres significatifs
+_HDR_MIN_US = 1
+_HDR_MAX_US = 60_000_000
+
+def calculer_percentiles(mesures_ms):
+    """Calcule p50/p95/p99 en ms à partir d'une liste de mesures (float ms)."""
+    hist = HdrHistogram(_HDR_MIN_US, _HDR_MAX_US, 3)
+    for ms in mesures_ms:
+        hist.record_value(max(1, int(ms * 1000)))
+    return {
+        "p50": round(hist.get_value_at_percentile(50)  / 1000, 2),
+        "p95": round(hist.get_value_at_percentile(95)  / 1000, 2),
+        "p99": round(hist.get_value_at_percentile(99)  / 1000, 2),
+    }
 
 def mesurer_dns(hostname):
     """Mesure uniquement le temps de resolution DNS. Retourne ms ou None."""
@@ -74,6 +90,7 @@ def mesurer_site(url, nb_mesures=None, timeout=None):
                 "message": "Erreur inconnue : " + str(e)
             }
 
+    percentiles = calculer_percentiles(mesures_http)
     return {
         "url": url,
         "erreur": False,
@@ -84,6 +101,10 @@ def mesurer_site(url, nb_mesures=None, timeout=None):
         "min": min(mesures_http),
         "max": max(mesures_http),
         "mesures": mesures_http,
+        # Percentiles HTTP
+        "p50": percentiles["p50"],
+        "p95": percentiles["p95"],
+        "p99": percentiles["p99"],
         # DNS
         "dns_moyenne": round(sum(mesures_dns) / len(mesures_dns), 2),
         "dns_min": min(mesures_dns),

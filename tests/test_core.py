@@ -1,14 +1,32 @@
 # -*- coding: utf-8 -*-
-from ping_tool.core import mesurer_site, sauvegarder_csv
+from ping_tool.core import mesurer_site, sauvegarder_csv, calculer_percentiles
 import os
 
+def test_calculer_percentiles():
+    """Les percentiles doivent être croissants et proches de la plage des mesures."""
+    mesures = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0, 90.0, 100.0]
+    p = calculer_percentiles(mesures)
+    assert p["p50"] <= p["p95"] <= p["p99"]
+    assert p["p50"] >= min(mesures)
+    # HdrHistogram arrondit aux buckets (3 chiffres significatifs) : tolérance de 0.1%
+    assert p["p99"] <= max(mesures) * 1.001
+
+def test_calculer_percentiles_valeur_unique():
+    """Avec une seule mesure, tous les percentiles doivent être égaux."""
+    p = calculer_percentiles([42.5])
+    assert p["p50"] == p["p95"] == p["p99"]
+
 def test_mesurer_site_valide():
-    """Un site valide doit retourner HTTP et DNS."""
+    """Un site valide doit retourner HTTP, DNS et les percentiles."""
     r = mesurer_site("https://google.com", nb_mesures=1)
     assert not r["erreur"]
     assert r["moyenne"] > 0
     assert r["dns_moyenne"] > 0
     assert r["dns_moyenne"] < r["moyenne"]  # DNS doit être plus rapide que HTTP
+    assert "p50" in r
+    assert "p95" in r
+    assert "p99" in r
+    assert r["p50"] <= r["p95"] <= r["p99"]
 
 def test_mesurer_dns_valide():
     """La resolution DNS d'un site valide doit reussir."""
