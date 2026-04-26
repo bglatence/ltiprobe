@@ -2,7 +2,7 @@
 import argparse
 from tqdm import tqdm
 from ping_tool import config
-from ping_tool.core import mesurer_site, sauvegarder_csv
+from ping_tool.core import mesurer_site, sauvegarder_csv, calculer_percentiles
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -45,6 +45,9 @@ def afficher_resultat(r):
         print(r["url"])
         print("  HTTP  -> moyenne: " + str(r["moyenne"]) + " ms"
               + "  min: " + str(r["min"]) + "  max: " + str(r["max"]))
+        print("  HTTP  -> p50: " + str(r["p50"]) + " ms"
+              + "  p95: " + str(r["p95"]) + " ms"
+              + "  p99: " + str(r["p99"]) + " ms")
         print("  DNS   -> moyenne: " + str(r["dns_moyenne"]) + " ms"
               + "  min: " + str(r["dns_min"]) + "  max: " + str(r["dns_max"]))
         print("  DNS % -> " + str(round(r["dns_moyenne"] / r["moyenne"] * 100, 1))
@@ -80,6 +83,7 @@ def main():
                 barre.update(1)
 
         if mesures_http:
+            percentiles = calculer_percentiles(mesures_http)
             resultat_final = {
                 "url": site,
                 "erreur": False,
@@ -89,6 +93,9 @@ def main():
                 "min": min(mesures_http),
                 "max": max(mesures_http),
                 "mesures": mesures_http,
+                "p50": percentiles["p50"],
+                "p95": percentiles["p95"],
+                "p99": percentiles["p99"],
                 "dns_moyenne": round(sum(mesures_dns) / len(mesures_dns), 2),
                 "dns_min": min(mesures_dns),
                 "dns_max": max(mesures_dns),
