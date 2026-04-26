@@ -123,6 +123,22 @@ def test_ping_tool_yaml_slo_cles():
             assert isinstance(valeur, (int, float)) and valeur > 0, \
                 f"Seuil SLO invalide pour {site['url']}.{cle} : {valeur}"
 
+def test_mesurer_tcp_valide():
+    """Un hôte accessible doit retourner des RTTs TCP positifs."""
+    from ping_tool.core import mesurer_tcp
+    r = mesurer_tcp("https://google.com", nb_mesures=2)
+    assert r is not None
+    assert r["moyenne"] > 0
+    assert r["min"] <= r["moyenne"] <= r["max"]
+    assert r["nb"] == 2
+    assert r["port"] == 443
+
+def test_mesurer_tcp_invalide():
+    """Un hôte inexistant doit retourner None."""
+    from ping_tool.core import mesurer_tcp
+    r = mesurer_tcp("https://hote.inexistant.invalid", nb_mesures=1)
+    assert r is None
+
 def test_mesurer_icmp_valide():
     """Un hôte accessible doit retourner des RTTs positifs."""
     from ping_tool.core import mesurer_icmp
