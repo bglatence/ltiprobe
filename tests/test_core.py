@@ -162,6 +162,21 @@ def test_mesurer_tcp_invalide():
     r = mesurer_tcp("https://hote.inexistant.invalid", nb_mesures=1)
     assert r is None
 
+def test_mesurer_tls_valide():
+    """Un site HTTPS accessible doit retourner des temps de handshake positifs."""
+    from ping_tool.core import mesurer_tls
+    r = mesurer_tls("https://google.com", nb_mesures=2)
+    assert r is not None
+    assert r["moyenne"] > 0
+    assert r["min"] <= r["moyenne"] <= r["max"]
+    assert r["nb"] == 2
+
+def test_mesurer_tls_invalide():
+    """Un hôte inexistant doit retourner None."""
+    from ping_tool.core import mesurer_tls
+    r = mesurer_tls("https://hote.inexistant.invalid", nb_mesures=1)
+    assert r is None
+
 @pytest.mark.skipif(os.getenv("CI") == "true", reason="ICMP bloqué en CI")
 def test_mesurer_icmp_valide():
     """Un hôte accessible doit retourner des RTTs positifs."""

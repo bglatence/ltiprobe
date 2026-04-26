@@ -2,6 +2,7 @@
 import urllib.request
 import urllib.error
 import socket
+import ssl
 import subprocess
 import re
 import time
@@ -95,6 +96,37 @@ def mesurer_tcp(hostname, nb_mesures=5, timeout=10):
         "p50":     round(hist.get_value_at_percentile(50) / 1000, 2),
         "nb":      len(rtts),
         "port":    port,
+    }
+
+def mesurer_tls(hostname, nb_mesures=5, timeout=10):
+    """Mesure la latence du handshake TLS seul (après TCP connect).
+
+    Retourne un dict {moyenne, min, max, p50, nb} en ms,
+    ou None si le site n'est pas HTTPS ou si TLS échoue.
+    """
+    hostname = hostname.replace("https://", "").replace("http://", "").split("/")[0]
+    ctx = ssl.create_default_context()
+    rtts = []
+    hist = creer_histogramme()
+    for _ in range(nb_mesures):
+        try:
+            sock = socket.create_connection((hostname, 443), timeout=timeout)
+            debut = time.perf_counter()
+            tls_sock = ctx.wrap_socket(sock, server_hostname=hostname)
+            ms = round((time.perf_counter() - debut) * 1000, 2)
+            tls_sock.close()
+            rtts.append(ms)
+            hdr_enregistrer(hist, ms)
+        except Exception:
+            pass
+    if not rtts:
+        return None
+    return {
+        "moyenne": round(sum(rtts) / len(rtts), 2),
+        "min":     round(min(rtts), 2),
+        "max":     round(max(rtts), 2),
+        "p50":     round(hist.get_value_at_percentile(50) / 1000, 2),
+        "nb":      len(rtts),
     }
 
 def mesurer_icmp(hostname, nb_mesures=5):
