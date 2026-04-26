@@ -12,7 +12,7 @@ def parse_arguments():
     parser.add_argument(
         "--version",
         action="version",
-        version="ping-tool 0.1.5"
+        version="ping-tool 0.2.0"
     )
     parser.add_argument(
         "sites",
