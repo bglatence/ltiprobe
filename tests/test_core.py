@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
+import os
+import pytest
 from ping_tool.core import mesurer_site, sauvegarder_csv, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo
 from ping_tool.i18n import get_translator
-import os
 
 
 def test_i18n_fr_header():
@@ -161,6 +162,7 @@ def test_mesurer_tcp_invalide():
     r = mesurer_tcp("https://hote.inexistant.invalid", nb_mesures=1)
     assert r is None
 
+@pytest.mark.skipif(os.getenv("CI") == "true", reason="ICMP bloqué en CI")
 def test_mesurer_icmp_valide():
     """Un hôte accessible doit retourner des RTTs positifs."""
     from ping_tool.core import mesurer_icmp
