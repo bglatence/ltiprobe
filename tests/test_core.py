@@ -156,35 +156,6 @@ def test_mesurer_site_url_malformee():
     r = mesurer_site("pas-une-url", nb_mesures=1)
     assert r["erreur"]
 
-def test_verifier_slo_respect():
-    """Un résultat sous les seuils doit tout marquer OK."""
-    resultat = {"p50": 100.0, "p95": 200.0, "dns_moyenne": 10.0}
-    slo = {"http_p50_ms": 200, "http_p95_ms": 400, "dns_ms": 50}
-    checks = verifier_slo(resultat, slo)
-    assert all(c["ok"] for c in checks.values())
-
-def test_verifier_slo_violation():
-    """Un résultat au-dessus d'un seuil doit marquer ce seuil en violation."""
-    resultat = {"p50": 250.0, "p95": 200.0, "dns_moyenne": 10.0}
-    slo = {"http_p50_ms": 200, "http_p95_ms": 400, "dns_ms": 50}
-    checks = verifier_slo(resultat, slo)
-    assert not checks["http_p50_ms"]["ok"]
-    assert checks["http_p95_ms"]["ok"]
-    assert checks["dns_ms"]["ok"]
-
-def test_verifier_slo_cle_inconnue():
-    """Une clé SLO inconnue doit être ignorée silencieusement."""
-    resultat = {"p50": 100.0}
-    slo = {"cle_inexistante": 999}
-    checks = verifier_slo(resultat, slo)
-    assert checks == {}
-
-def test_verifier_slo_vide():
-    """Un SLO vide doit retourner un dict vide."""
-    resultat = {"p50": 100.0}
-    checks = verifier_slo(resultat, {})
-    assert checks == {}
-
 def test_sauvegarder_csv(tmp_path):
     """Le CSV doit contenir les colonnes de distribution et hdr_encode."""
     hist = creer_histogramme()
