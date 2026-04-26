@@ -30,6 +30,9 @@ include = ["ping_tool*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+filterwarnings = [
+    "ignore::DeprecationWarning:ctypes",
+]
 
 [tool.ruff]
 exclude = [
