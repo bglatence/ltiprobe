@@ -7,6 +7,9 @@ nb_mesures: 10
 # Timeout HTTP en secondes
 timeout: 10
 
+# Langue d'affichage : FR (français) ou EN (anglais)
+langue: FR
+
 # Liste des sites à mesurer
 # Chaque site peut définir un SLO (Service Level Objective) optionnel.
 # Clés SLO disponibles :
@@ -24,7 +27,7 @@ sites:
       http_p95_ms: 400
       dns_ms: 50
 
-  - url: https://github.com
+  - url: https://www.latencetech.com
     slo:
       http_p50_ms: 300
       http_p95_ms: 600

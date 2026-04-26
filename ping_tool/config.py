@@ -7,6 +7,7 @@ _CONFIG_FILE = "ping-tool.yaml"
 _DEFAULTS = {
     "nb_mesures": 10,
     "timeout": 10,
+    "langue": "FR",
     "sites": [
         {"url": "https://google.com"},
         {"url": "https://github.com"},
@@ -26,5 +27,6 @@ _cfg = _charger()
 
 NB_MESURES   = _cfg["nb_mesures"]
 TIMEOUT      = _cfg["timeout"]
+LANGUE       = _cfg.get("langue", "FR").upper()
 SITES_DEFAUT = _cfg["sites"]
 FICHIER_CSV  = None
