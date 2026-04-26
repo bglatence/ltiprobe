@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from ping_tool.core import mesurer_site, sauvegarder_csv, creer_histogramme, hdr_enregistrer, hdr_stats
+from ping_tool.core import mesurer_site, sauvegarder_csv, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo
 import os
 
 def test_hdr_stats_percentiles_croissants():
@@ -24,6 +24,53 @@ def test_hdr_stats_contient_encode():
     s = hdr_stats(hist)
     assert "hdr_encode" in s
     assert len(s["hdr_encode"]) > 0
+
+def test_verifier_slo_respect():
+    """Un résultat sous les seuils doit tout marquer OK."""
+    resultat = {"p50": 100.0, "p95": 200.0, "dns_moyenne": 10.0}
+    slo = {"http_p50_ms": 200, "http_p95_ms": 400, "dns_ms": 50}
+    checks = verifier_slo(resultat, slo)
+    assert all(c["ok"] for c in checks.values())
+
+def test_verifier_slo_violation():
+    """Un résultat au-dessus d'un seuil doit marquer ce seuil en violation."""
+    resultat = {"p50": 250.0, "p95": 200.0, "dns_moyenne": 10.0}
+    slo = {"http_p50_ms": 200, "http_p95_ms": 400, "dns_ms": 50}
+    checks = verifier_slo(resultat, slo)
+    assert not checks["http_p50_ms"]["ok"]
+    assert checks["http_p95_ms"]["ok"]
+    assert checks["dns_ms"]["ok"]
+
+def test_verifier_slo_cle_inconnue():
+    """Une clé SLO inconnue doit être ignorée silencieusement."""
+    resultat = {"p50": 100.0}
+    checks = verifier_slo(resultat, {"cle_inexistante": 999})
+    assert checks == {}
+
+def test_verifier_slo_vide():
+    """Un SLO vide doit retourner un dict vide."""
+    checks = verifier_slo({"p50": 100.0}, {})
+    assert checks == {}
+
+def test_config_yaml(tmp_path):
+    """Le chargeur YAML doit lire nb_mesures et les sites correctement."""
+    yaml_content = (
+        "nb_mesures: 5\n"
+        "timeout: 3\n"
+        "sites:\n"
+        "  - url: https://example.com\n"
+        "    slo:\n"
+        "      http_p50_ms: 100\n"
+    )
+    config_file = tmp_path / "ping-tool.yaml"
+    config_file.write_text(yaml_content, encoding="utf-8")
+
+    import yaml
+    data = yaml.safe_load(config_file.read_text())
+    assert data["nb_mesures"] == 5
+    assert data["timeout"] == 3
+    assert data["sites"][0]["url"] == "https://example.com"
+    assert data["sites"][0]["slo"]["http_p50_ms"] == 100
 
 def test_mesurer_site_valide():
     """Un site valide doit retourner HTTP, DNS et la distribution complète."""

@@ -33,6 +33,37 @@ def hdr_stats(hist):
         "hdr_encode": hist.encode(),
     }
 
+# Correspondance clé SLO → clé dans le dict résultat
+_SLO_VERS_RESULTAT = {
+    "http_p50_ms":  "p50",
+    "http_p75_ms":  "p75",
+    "http_p90_ms":  "p90",
+    "http_p95_ms":  "p95",
+    "http_p99_ms":  "p99",
+    "http_p999_ms": "p999",
+    "dns_ms":       "dns_moyenne",
+}
+
+def verifier_slo(resultat, slo):
+    """Compare un résultat mesuré contre un dict SLO.
+
+    Retourne un dict {cle_slo: {seuil, valeur, ok}} pour chaque clé du SLO.
+    """
+    checks = {}
+    for cle_slo, seuil in slo.items():
+        cle_res = _SLO_VERS_RESULTAT.get(cle_slo)
+        if cle_res is None:
+            continue
+        valeur = resultat.get(cle_res)
+        if valeur is None:
+            continue
+        checks[cle_slo] = {
+            "seuil":  seuil,
+            "valeur": valeur,
+            "ok":     valeur <= seuil,
+        }
+    return checks
+
 def mesurer_dns(hostname):
     """Mesure uniquement le temps de resolution DNS. Retourne ms ou None."""
     try:

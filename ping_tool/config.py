@@ -1,18 +1,30 @@
 # -*- coding: utf-8 -*-
+import os
+import yaml
 
-# Sites a tester par defaut
-SITES_DEFAUT = [
-    "https://google.com",
-    "https://github.com",
-    "https://youtube.com",
-    "https://apple.com"
-]
+_CONFIG_FILE = "ping-tool.yaml"
 
-# Nombre de mesures par site
-NB_MESURES = 10
+_DEFAULTS = {
+    "nb_mesures": 10,
+    "timeout": 10,
+    "sites": [
+        {"url": "https://google.com"},
+        {"url": "https://github.com"},
+        {"url": "https://youtube.com"},
+        {"url": "https://apple.com"},
+    ],
+}
 
-# Timeout en secondes
-TIMEOUT = 10
+def _charger():
+    if os.path.exists(_CONFIG_FILE):
+        with open(_CONFIG_FILE, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        return {**_DEFAULTS, **data}
+    return _DEFAULTS.copy()
 
-# Nom du fichier CSV de sortie (None = nom automatique)
-FICHIER_CSV = None
+_cfg = _charger()
+
+NB_MESURES   = _cfg["nb_mesures"]
+TIMEOUT      = _cfg["timeout"]
+SITES_DEFAUT = _cfg["sites"]
+FICHIER_CSV  = None
