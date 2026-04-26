@@ -72,6 +72,57 @@ def test_config_yaml(tmp_path):
     assert data["sites"][0]["url"] == "https://example.com"
     assert data["sites"][0]["slo"]["http_p50_ms"] == 100
 
+_CLES_SLO_VALIDES = {
+    "http_p50_ms", "http_p75_ms", "http_p90_ms",
+    "http_p95_ms", "http_p99_ms", "http_p999_ms", "dns_ms",
+}
+
+def test_ping_tool_yaml_existe():
+    """Le fichier ping-tool.yaml doit exister à la racine du projet."""
+    assert os.path.exists("ping-tool.yaml"), "ping-tool.yaml introuvable à la racine"
+
+def test_ping_tool_yaml_structure():
+    """ping-tool.yaml doit avoir les clés obligatoires avec les bons types."""
+    import yaml
+    with open("ping-tool.yaml", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    assert isinstance(data.get("nb_mesures"), int), "nb_mesures doit être un entier"
+    assert data["nb_mesures"] > 0, "nb_mesures doit être > 0"
+    assert isinstance(data.get("timeout"), int), "timeout doit être un entier"
+    assert data["timeout"] > 0, "timeout doit être > 0"
+    assert isinstance(data.get("sites"), list), "sites doit être une liste"
+    assert len(data["sites"]) > 0, "sites ne doit pas être vide"
+
+def test_ping_tool_yaml_sites():
+    """Chaque site dans ping-tool.yaml doit avoir une URL valide."""
+    import yaml
+    with open("ping-tool.yaml", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    for site in data["sites"]:
+        assert "url" in site, f"Site sans clé 'url' : {site}"
+        url = site["url"]
+        assert url.startswith("http://") or url.startswith("https://"), \
+            f"URL invalide (doit commencer par http:// ou https://) : {url}"
+
+def test_ping_tool_yaml_slo_cles():
+    """Les clés SLO dans ping-tool.yaml doivent être reconnues par verifier_slo."""
+    import yaml
+    with open("ping-tool.yaml", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    for site in data["sites"]:
+        slo = site.get("slo")
+        if not slo:
+            continue
+        cles_inconnues = set(slo.keys()) - _CLES_SLO_VALIDES
+        assert not cles_inconnues, \
+            f"Clés SLO inconnues pour {site['url']} : {cles_inconnues}"
+        for cle, valeur in slo.items():
+            assert isinstance(valeur, (int, float)) and valeur > 0, \
+                f"Seuil SLO invalide pour {site['url']}.{cle} : {valeur}"
+
 def test_mesurer_site_valide():
     """Un site valide doit retourner HTTP, DNS et la distribution complète."""
     r = mesurer_site("https://google.com", nb_mesures=1)
