@@ -1,12 +1,23 @@
 # -*- coding: utf-8 -*-
 import argparse
+import sys
+import threading
 from tqdm import tqdm
 from ping_tool import config
 from ping_tool.core import (
     mesurer_site, sauvegarder_csv,
     creer_histogramme, hdr_enregistrer, hdr_stats,
-    verifier_slo,
+    verifier_slo, mesurer_icmp, mesurer_tcp,
 )
+
+# Codes ANSI — désactivés si la sortie n'est pas un terminal (fichier, CI)
+def _ansi(code):
+    return "\033[" + code + "m" if sys.stdout.isatty() else ""
+
+VERT   = _ansi("92")
+ORANGE = _ansi("33")
+ROUGE  = _ansi("91")
+RESET  = _ansi("0")
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -47,21 +58,55 @@ def indicateur_stabilite(p50, p99):
     if p50 <= 0:
         return "n/a"
     ratio = p99 / p50
+    ratio_str = "(p99/p50 = " + str(round(ratio, 1)) + "x)"
     if ratio < 2:
-        return "tres stable  (p99/p50 = " + str(round(ratio, 1)) + "x)"
+        return VERT  + "tres stable  " + ratio_str + RESET
     if ratio < 5:
-        return "stable       (p99/p50 = " + str(round(ratio, 1)) + "x)"
+        return VERT  + "stable       " + ratio_str + RESET
     if ratio < 10:
-        return "variable     (p99/p50 = " + str(round(ratio, 1)) + "x)"
-    return "instable     (p99/p50 = " + str(round(ratio, 1)) + "x)"
+        return ORANGE + "variable     " + ratio_str + RESET
+    return ROUGE + "instable     " + ratio_str + RESET
 
 def _slo_tag(slo_checks, cle_slo):
     """Retourne le tag SLO inline pour une clé, ou chaîne vide si absent."""
     if not slo_checks or cle_slo not in slo_checks:
         return ""
     c = slo_checks[cle_slo]
-    statut = "OK" if c["ok"] else "VIOLATION"
-    return "  [SLO <=" + str(c["seuil"]) + "ms  " + statut + "]"
+    if c["ok"]:
+        return "  [SLO <=" + str(c["seuil"]) + "ms  " + VERT + "OK" + RESET + "]"
+    return "  [SLO <=" + str(c["seuil"]) + "ms  " + ROUGE + "VIOLATION" + RESET + "]"
+
+def _delta(a, b):
+    """Retourne '+X ms' si b > a, sinon chaîne vide."""
+    if a is None or b is None or a <= 0:
+        return ""
+    d = round(b - a, 1)
+    return ("  (+" + str(d) + " ms)") if d > 0 else ""
+
+def afficher_protocoles(icmp, tcp, http_p50, site):
+    """Affiche la comparaison en couches ICMP / TCP / HTTP."""
+    port = tcp["port"] if tcp else 443
+    icmp_moy = icmp["moyenne"] if icmp else None
+    tcp_moy  = tcp["moyenne"]  if tcp  else None
+
+    print("  --- Comparaison protocoles ---")
+    if icmp:
+        print("  ICMP  (réseau)     : " + str(icmp_moy) + " ms"
+              + "  min: " + str(icmp["min"]) + "  max: " + str(icmp["max"])
+              + "  (" + str(icmp["nb"]) + " paquets)")
+    else:
+        print("  ICMP  (réseau)     : non disponible")
+
+    if tcp:
+        print("  TCP   (port " + str(port) + ")   : " + str(tcp_moy) + " ms"
+              + "  min: " + str(tcp["min"]) + "  max: " + str(tcp["max"])
+              + _delta(icmp_moy, tcp_moy))
+    else:
+        print("  TCP   (port " + str(port) + ")   : non disponible")
+
+    if http_p50:
+        print("  HTTP  (p50)        : " + str(http_p50) + " ms"
+              + _delta(tcp_moy if tcp_moy else icmp_moy, http_p50))
 
 def afficher_resultat(r, slo_checks=None):
     if r["erreur"]:
@@ -86,9 +131,11 @@ def afficher_resultat(r, slo_checks=None):
     if slo_checks:
         nb_violations = sum(1 for c in slo_checks.values() if not c["ok"])
         if nb_violations == 0:
-            print("  SLO   -> tous les objectifs sont respectes")
+            print("  SLO   -> " + VERT + "tous les objectifs sont respectes" + RESET)
         else:
-            print("  SLO   -> " + str(nb_violations) + " violation(s)")
+            print("  SLO   -> " + ROUGE + str(nb_violations) + " violation(s)" + RESET)
+    if "icmp" in r or "tcp" in r:
+        afficher_protocoles(r.get("icmp"), r.get("tcp"), r.get("p50"), r["url"])
     print("")
 
 def main():
@@ -114,6 +161,22 @@ def main():
         hist_http = creer_histogramme()
         mesures_dns = []
         erreur = None
+        icmp_result = {}
+        tcp_result  = {}
+
+        hostname = site.split("//")[-1].split("/")[0]
+        icmp_thread = threading.Thread(
+            target=lambda: icmp_result.update(
+                {"icmp": mesurer_icmp(hostname, nb_mesures=args.nombre)}
+            )
+        )
+        tcp_thread = threading.Thread(
+            target=lambda: tcp_result.update(
+                {"tcp": mesurer_tcp(site, nb_mesures=args.nombre)}
+            )
+        )
+        icmp_thread.start()
+        tcp_thread.start()
 
         with tqdm(
             total=args.nombre,
@@ -132,6 +195,9 @@ def main():
                 mesures_dns.append(r["dns_moyenne"])
                 barre.update(1)
 
+        icmp_thread.join()
+        tcp_thread.join()
+
         if erreur:
             resultats.append(erreur)
             continue
@@ -148,6 +214,8 @@ def main():
                 "dns_moyenne": round(sum(mesures_dns) / len(mesures_dns), 2),
                 "dns_min":     min(mesures_dns),
                 "dns_max":     max(mesures_dns),
+                "icmp":        icmp_result.get("icmp"),
+                "tcp":         tcp_result.get("tcp"),
             }
             slo_checks = verifier_slo(resultat_final, slo) if slo else None
             resultat_final["slo_checks"] = slo_checks
