@@ -3,4 +3,5 @@ pytest-mock>=3.0
 ruff>=0.4
 mypy>=1.0
 types-tqdm
+types-PyYAML
 bandit>=1.7

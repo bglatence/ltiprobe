@@ -94,7 +94,7 @@ def afficher_resultat(r, slo_checks=None):
 def main():
     args = parse_arguments()
 
-    # Normalisation : les sites CLI (strings) n'ont pas de SLO
+    # Les sites passés en CLI (strings) n'ont pas de SLO
     if args.sites:
         sites_config = [{"url": s} for s in args.sites]
     else:
@@ -149,7 +149,6 @@ def main():
                 "dns_min":     min(mesures_dns),
                 "dns_max":     max(mesures_dns),
             }
-
             slo_checks = verifier_slo(resultat_final, slo) if slo else None
             resultat_final["slo_checks"] = slo_checks
 

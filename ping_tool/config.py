@@ -1,42 +1,30 @@
 # -*- coding: utf-8 -*-
+import os
+import yaml
 
-# Sites a tester par defaut
-# Chaque site peut definir un SLO optionnel avec les cles :
-#   http_p50_ms, http_p75_ms, http_p90_ms, http_p95_ms, http_p99_ms, http_p999_ms, dns_ms
-SITES_DEFAUT = [
-    {
-        "url": "https://google.com",
-        "slo": {
-            "http_p50_ms":  200,
-            "http_p95_ms":  400,
-            "dns_ms":        50,
-        }
-    },
-    {
-        "url": "https://github.com",
-        "slo": {
-            "http_p50_ms":  300,
-            "http_p95_ms":  600,
-            "dns_ms":        80,
-        }
-    },
-    {
-        "url": "https://youtube.com",
-        "slo": {
-            "http_p50_ms":  250,
-            "http_p95_ms":  500,
-        }
-    },
-    {
-        "url": "https://apple.com",
-    },
-]
+_CONFIG_FILE = "ping-tool.yaml"
 
-# Nombre de mesures par site
-NB_MESURES = 10
+_DEFAULTS = {
+    "nb_mesures": 10,
+    "timeout": 10,
+    "sites": [
+        {"url": "https://google.com"},
+        {"url": "https://github.com"},
+        {"url": "https://youtube.com"},
+        {"url": "https://apple.com"},
+    ],
+}
 
-# Timeout en secondes
-TIMEOUT = 10
+def _charger():
+    if os.path.exists(_CONFIG_FILE):
+        with open(_CONFIG_FILE, encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+        return {**_DEFAULTS, **data}
+    return _DEFAULTS.copy()
 
-# Nom du fichier CSV de sortie (None = nom automatique)
-FICHIER_CSV = None
+_cfg = _charger()
+
+NB_MESURES   = _cfg["nb_mesures"]
+TIMEOUT      = _cfg["timeout"]
+SITES_DEFAUT = _cfg["sites"]
+FICHIER_CSV  = None

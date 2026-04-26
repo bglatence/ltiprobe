@@ -47,9 +47,9 @@ _SLO_VERS_RESULTAT = {
 def verifier_slo(resultat, slo):
     """Compare un résultat mesuré contre un dict SLO.
 
-    Retourne un dict {cle_slo: {seuil, valeur, ok}} pour chaque cle du SLO.
+    Retourne un dict {cle_slo: {seuil, valeur, ok}} pour chaque clé du SLO.
     """
-    violations = {}
+    checks = {}
     for cle_slo, seuil in slo.items():
         cle_res = _SLO_VERS_RESULTAT.get(cle_slo)
         if cle_res is None:
@@ -57,12 +57,12 @@ def verifier_slo(resultat, slo):
         valeur = resultat.get(cle_res)
         if valeur is None:
             continue
-        violations[cle_slo] = {
+        checks[cle_slo] = {
             "seuil":  seuil,
             "valeur": valeur,
             "ok":     valeur <= seuil,
         }
-    return violations
+    return checks
 
 def mesurer_dns(hostname):
     """Mesure uniquement le temps de resolution DNS. Retourne ms ou None."""

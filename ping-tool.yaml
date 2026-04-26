@@ -1,0 +1,39 @@
+# ping-tool — fichier de configuration
+# Placez ce fichier à la racine du projet ou dans le répertoire de travail.
+
+# Nombre de mesures par site
+nb_mesures: 10
+
+# Timeout HTTP en secondes
+timeout: 10
+
+# Liste des sites à mesurer
+# Chaque site peut définir un SLO (Service Level Objective) optionnel.
+# Clés SLO disponibles :
+#   http_p50_ms   — latence HTTP médiane (P50)
+#   http_p75_ms   — latence HTTP P75
+#   http_p90_ms   — latence HTTP P90
+#   http_p95_ms   — latence HTTP P95
+#   http_p99_ms   — latence HTTP P99
+#   http_p999_ms  — latence HTTP P99.9
+#   dns_ms        — latence DNS moyenne
+sites:
+  - url: https://google.com
+    slo:
+      http_p50_ms: 200
+      http_p95_ms: 400
+      dns_ms: 50
+
+  - url: https://github.com
+    slo:
+      http_p50_ms: 300
+      http_p95_ms: 600
+      dns_ms: 80
+
+  - url: https://youtube.com
+    slo:
+      http_p50_ms: 250
+      http_p95_ms: 500
+
+  - url: https://apple.com
+    # aucun SLO défini pour ce site
