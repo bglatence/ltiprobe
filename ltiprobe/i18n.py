@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 _TRANSLATIONS: dict[str, dict[str, str]] = {
     "FR": {
-        "header":           "Mesure des temps de réponse ({n} essais)...",
+        "header":           "ltiprobe : mesure des temps de réponse de sites web ({n} essais)\nfichier de configuration : {cfg}",
         "http_dist":        "  HTTP  distribution ({n} mesures)",
         "moyenne":          "    moyenne : {v} ms   min: {min}   max: {max}",
         "p50":              "    p50     : {v} ms",
@@ -57,7 +57,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "cdn_erreur":       "  Cache  →  information non disponible",
     },
     "EN": {
-        "header":           "Measuring response times ({n} attempts)...",
+        "header":           "ltiprobe: measuring response times of web sites ({n} attempts)\nusing config file: {cfg}",
         "http_dist":        "  HTTP  distribution ({n} measurements)",
         "moyenne":          "    average : {v} ms   min: {min}   max: {max}",
         "p50":              "    p50     : {v} ms",

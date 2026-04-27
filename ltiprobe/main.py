@@ -250,7 +250,8 @@ def main():
             for s in cfg["sites"]
         ]
 
-    print(t("header", n=args.nombre) + "\n")
+    cfg_file = args.config_file or config.FICHIER_DEFAUT
+    print(t("header", n=args.nombre, cfg=cfg_file) + "\n")
 
     resultats = []
 
