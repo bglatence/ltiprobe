@@ -21,31 +21,45 @@ ORANGE = _ansi("33")
 ROUGE  = _ansi("91")
 RESET  = _ansi("0")
 
+# Traducteur — initialisé dans main() après chargement du fichier de config
 t = get_translator(config.LANGUE)
 
 def parse_arguments():
+    # Pré-parse pour récupérer --config-file avant de charger la config complète
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--config-file", default=None)
+    pre_args, _ = pre.parse_known_args()
+
+    cfg = config.charger(pre_args.config_file)
+
     parser = argparse.ArgumentParser(
         prog="ping-tool",
         description="Mesure les temps de reponse HTTP de sites web"
     )
     parser.add_argument("--version", action="version", version="ping-tool 0.2.1")
     parser.add_argument(
+        "--config-file",
+        default=None,
+        metavar="FICHIER",
+        help=f"Fichier de configuration YAML (defaut: {config.FICHIER_DEFAUT})"
+    )
+    parser.add_argument(
         "sites", nargs="*",
         help="Sites a tester (ex: https://google.com https://github.com)"
     )
     parser.add_argument(
-        "-n", "--nombre", type=int, default=config.NB_MESURES,
+        "-n", "--nombre", type=int, default=cfg["nb_mesures"],
         help="Nombre de mesures par site (defaut: %(default)s)"
     )
     parser.add_argument("--csv", action="store_true",
         help="Sauvegarder les resultats dans un fichier CSV")
     parser.add_argument(
-        "--timeout", type=int, default=config.TIMEOUT,
+        "--timeout", type=int, default=cfg["timeout"],
         help="Timeout en secondes (defaut: %(default)s)"
     )
     parser.add_argument("--traceroute", action="store_true",
         help="Afficher le nombre de hops reseau vers chaque site")
-    return parser.parse_args()
+    return parser.parse_args(), cfg
 
 # ── Indicateurs colorés ───────────────────────────────────────────────────────
 
@@ -170,14 +184,22 @@ def afficher_resultat(r, slo_checks=None):
 # ── Point d'entrée ────────────────────────────────────────────────────────────
 
 def main():
-    args = parse_arguments()
+    global t
+    try:
+        args, cfg = parse_arguments()
+    except FileNotFoundError as e:
+        print("Erreur : " + str(e), file=sys.stderr)
+        sys.exit(1)
+
+    # Réinitialise le traducteur avec la langue du fichier de config chargé
+    t = get_translator(cfg.get("langue", "FR").upper())
 
     if args.sites:
         sites_config = [{"url": s} for s in args.sites]
     else:
         sites_config = [
             s if isinstance(s, dict) else {"url": s}
-            for s in config.SITES_DEFAUT
+            for s in cfg["sites"]
         ]
 
     print(t("header", n=args.nombre) + "\n")
