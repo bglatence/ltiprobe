@@ -216,6 +216,27 @@ alerting:
 
 ---
 
+### 15. Comparaison HTTP/1.1 vs HTTP/2 vs HTTP/3 (QUIC)
+**Inspiré de** `curl --http3`, `h2load`
+
+HTTP/3 utilise QUIC (UDP) au lieu de TCP+TLS, ce qui réduit le coût d'établissement de connexion
+à 0-RTT ou 1-RTT. Mesurer les trois générations sur un même site révèle le gain réel de QUIC.
+
+```
+  HTTP/1.1  p50 :  38 ms
+  HTTP/2    p50 :  32 ms  (-6 ms)
+  HTTP/3    p50 :  21 ms  (-17 ms)  ← QUIC, 1-RTT
+```
+
+**Contraintes d'implémentation :**
+- Python stdlib (`urllib`) ne supporte pas HTTP/3 — nécessite `aioquic` ou `httpx` avec backend QUIC
+- UDP/443 souvent bloqué par les firewalls d'entreprise → fallback automatique vers HTTP/2
+- La négociation ALPN dépend du réseau : difficile de *forcer* HTTP/3 de manière fiable
+
+Utile pour valider l'apport réel de QUIC sur un site donné depuis un réseau spécifique.
+
+---
+
 ## Ce que ping-tool fait déjà mieux que la plupart des outils comparés
 
 | Fonctionnalité | ping-tool | hey | mtr | blackbox_exporter | curl |
