@@ -58,6 +58,9 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "cdn_pop":          "PoP: {p}",
         "cdn_aucun":        "  Cache  →  pas de CDN détecté",
         "cdn_erreur":       "  Cache  →  information non disponible",
+        "intervalle_titre": "\n── Scan #{n}  {heure} ────────────────────────────────────",
+        "intervalle_attente": "\n  prochain scan dans {s}s  (Ctrl+C pour arrêter)\n",
+        "degradation_alerte": "  ⚠  {metric} : {avant}ms → {apres}ms (+{pct}%)  depuis {heure}",
     },
     "EN": {
         "header":           "ltiprobe ({ver}):\n\n* measuring response times of web sites ({n} attempts)\n* using config file: {cfg}",
@@ -117,6 +120,9 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "cdn_pop":          "PoP: {p}",
         "cdn_aucun":        "  Cache  →  no CDN detected",
         "cdn_erreur":       "  Cache  →  information not available",
+        "intervalle_titre": "\n── Scan #{n}  {heure} ────────────────────────────────────",
+        "intervalle_attente": "\n  next scan in {s}s  (Ctrl+C to stop)\n",
+        "degradation_alerte": "  ⚠  {metric} : {avant}ms → {apres}ms (+{pct}%)  since {heure}",
     },
 }
 
