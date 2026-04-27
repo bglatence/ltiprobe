@@ -10,6 +10,7 @@ from ping_tool.core import (
     creer_histogramme, hdr_enregistrer, hdr_stats,
     verifier_slo, verifier_assertions,
     mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute,
+    detecter_cdn,
     SLO_UNITES,
 )
 
@@ -137,6 +138,36 @@ def afficher_traceroute(tr):
     print(t("traceroute_hops", n=tr["nb_hops"])
           + "  " + indicateur_hops(tr["nb_hops"]) + masques)
 
+def afficher_cdn(cdn_info):
+    """Affiche la section Cache / CDN."""
+    if cdn_info is None:
+        print(t("cdn_erreur"))
+        return
+    print(t("cdn_titre"))
+    cdn_nom = cdn_info.get("cdn") or t("cdn_inconnu")
+    cache   = cdn_info.get("cache")
+    age_s   = cdn_info.get("age_s")
+    pop     = cdn_info.get("pop")
+
+    statut = ""
+    if cache == "HIT":
+        statut = VERT  + t("cdn_hit")  + RESET
+    elif cache == "MISS":
+        statut = ORANGE + t("cdn_miss") + RESET
+
+    parties = []
+    if pop:
+        parties.append(t("cdn_pop", p=pop))
+    if age_s is not None:
+        parties.append(t("cdn_age", s=age_s))
+    suite = "  ".join(parties)
+
+    if not cache and not cdn_info.get("cdn"):
+        print(t("cdn_aucun"))
+    else:
+        print(t("cdn_ligne", statut=statut, cdn=cdn_nom, suite=suite))
+
+
 def afficher_assertions(assert_checks):
     """Affiche la section Validation HTTP."""
     if not assert_checks:
@@ -192,6 +223,8 @@ def afficher_resultat(r, slo_checks=None):
     if "icmp" in r or "tcp" in r or "tls" in r:
         afficher_protocoles(r.get("icmp"), r.get("tcp"), r.get("tls"), r.get("p50"), r["url"])
 
+    if "cdn_info" in r:
+        afficher_cdn(r["cdn_info"])
     afficher_assertions(r.get("assert_checks"))
     afficher_analyse_slo(slo_checks)
     print("")
@@ -233,6 +266,7 @@ def main():
         tcp_result  = {}
         tls_result  = {}
         tr_result   = {}
+        cdn_result  = {}
 
         hostname = site.split("//")[-1].split("/")[0]
         is_https = site.startswith("https://")
@@ -257,9 +291,15 @@ def main():
                 {"tr": mesurer_traceroute(hostname)}
             )
         )
+        cdn_thread = threading.Thread(
+            target=lambda: cdn_result.update(
+                {"cdn": detecter_cdn(site, timeout=args.timeout)}
+            )
+        )
 
         icmp_thread.start()
         tcp_thread.start()
+        cdn_thread.start()
         if is_https:
             tls_thread.start()
         if args.traceroute:
@@ -284,6 +324,7 @@ def main():
 
         icmp_thread.join()
         tcp_thread.join()
+        cdn_thread.join()
         if is_https:
             tls_thread.join()
         if args.traceroute:
@@ -295,10 +336,11 @@ def main():
 
         if hist_http.get_total_count() > 0:
             stats    = hdr_stats(hist_http)
-            icmp     = icmp_result.get("icmp")
-            tcp      = tcp_result.get("tcp")
-            tls      = tls_result.get("tls") if is_https else None
+            icmp      = icmp_result.get("icmp")
+            tcp       = tcp_result.get("tcp")
+            tls       = tls_result.get("tls") if is_https else None
             traceroute = tr_result.get("tr") if args.traceroute else None
+            cdn_info  = cdn_result.get("cdn")
 
             p50      = stats["p50"]
             p99      = stats["p99"]
@@ -322,6 +364,7 @@ def main():
                 "tcp":        tcp,
                 "tls":        tls,
                 "traceroute": traceroute,
+                "cdn_info":   cdn_info,
                 # clés plates pour le SLO
                 "stabilite_ratio": round(p99 / p50, 2) if p50 > 0 else None,
                 "icmp_ms":         icmp["moyenne"] if icmp else None,
