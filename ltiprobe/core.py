@@ -382,8 +382,9 @@ def mesurer_dns(hostname):
         return None
 
 def extraire_hostname(url):
-    """Extrait le hostname d'une URL. Ex: https://google.com -> google.com"""
-    url = url.replace("https://", "").replace("http://", "")
+    """Extrait le hostname d'une URL, même si le schéma est malformé (https// vs https://)."""
+    if "//" in url:
+        return url.split("//")[-1].split("/")[0]
     return url.split("/")[0]
 
 def mesurer_site(url, nb_mesures=None, timeout=None, verify_tls=True):

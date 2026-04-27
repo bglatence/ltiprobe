@@ -19,6 +19,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "dns":              "  DNS   -> moyenne: {v} ms  min: {min}  max: {max}",
         "dns_ip_na":        "  DNS   -> N/A (adresse IP directe)",
         "ip_non_joignable": "Adresse IP non joignable : {msg}",
+        "url_invalide":     "URL invalide (doit commencer par http:// ou https://) : {url}",
         "slo_ok":           "  SLO   -> tous les objectifs sont respectés",
         "slo_violation":    "  SLO   -> {n} violation(s)",
         "slo_tag_ok":       "  [SLO <={s}ms  {ok}OK{reset}]",
@@ -57,6 +58,9 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "cdn_pop":          "PoP: {p}",
         "cdn_aucun":        "  Cache  →  pas de CDN détecté",
         "cdn_erreur":       "  Cache  →  information non disponible",
+        "intervalle_titre": "\n── Scan #{n}  {heure} ────────────────────────────────────",
+        "intervalle_attente": "\n  prochain scan dans {s}s  (Ctrl+C pour arrêter)\n",
+        "degradation_alerte": "  ⚠  {metric} : {avant}ms → {apres}ms (+{pct}%)  depuis {heure}",
     },
     "EN": {
         "header":           "ltiprobe ({ver}):\n\n* measuring response times of web sites ({n} attempts)\n* using config file: {cfg}",
@@ -77,6 +81,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "dns":              "  DNS   -> average: {v} ms  min: {min}  max: {max}",
         "dns_ip_na":        "  DNS   -> N/A (direct IP address)",
         "ip_non_joignable": "IP address unreachable: {msg}",
+        "url_invalide":     "Invalid URL (must start with http:// or https://): {url}",
         "slo_ok":           "  SLO   -> all objectives met",
         "slo_violation":    "  SLO   -> {n} violation(s)",
         "slo_tag_ok":       "  [SLO <={s}ms  {ok}OK{reset}]",
@@ -115,6 +120,9 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "cdn_pop":          "PoP: {p}",
         "cdn_aucun":        "  Cache  →  no CDN detected",
         "cdn_erreur":       "  Cache  →  information not available",
+        "intervalle_titre": "\n── Scan #{n}  {heure} ────────────────────────────────────",
+        "intervalle_attente": "\n  next scan in {s}s  (Ctrl+C to stop)\n",
+        "degradation_alerte": "  ⚠  {metric} : {avant}ms → {apres}ms (+{pct}%)  since {heure}",
     },
 }
 

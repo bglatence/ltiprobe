@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 import argparse
 import sys
+import time
 import threading
+from datetime import datetime
 from tqdm import tqdm
 from ltiprobe import config, __version__
 from ltiprobe.i18n import get_translator
@@ -25,6 +27,17 @@ RESET  = _ansi("0")
 
 # Traducteur — initialisé dans main() après chargement du fichier de config
 t = get_translator(config.LANGUE)
+
+# Seuil de détection de dégradation : +50% par rapport à l'itération précédente
+SEUIL_DEGRADATION = 0.50
+
+_NOMS_METRIQUES = {
+    "p50":         "p50",
+    "p95":         "p95",
+    "p99":         "p99",
+    "dns_moyenne": "dns",
+    "icmp_ms":     "icmp",
+}
 
 def parse_arguments():
     # Pré-parse pour récupérer --config-file avant de charger la config complète
@@ -63,6 +76,10 @@ def parse_arguments():
         help="Afficher le nombre de hops reseau vers chaque site")
     parser.add_argument("--no-verify-tls", action="store_true",
         help="Desactiver la validation du certificat TLS (utile pour les adresses IP)")
+    parser.add_argument(
+        "--interval", type=int, default=None, metavar="SECONDES",
+        help="Relancer les mesures toutes les N secondes (monitoring continu)"
+    )
     return parser.parse_args(), cfg
 
 # ── Indicateurs colorés ───────────────────────────────────────────────────────
@@ -141,7 +158,6 @@ def afficher_traceroute(tr):
           + "  " + indicateur_hops(tr["nb_hops"]) + masques)
 
 def afficher_cdn(cdn_info):
-    """Affiche la section Cache / CDN."""
     if cdn_info is None:
         print(t("cdn_erreur"))
         return
@@ -169,9 +185,7 @@ def afficher_cdn(cdn_info):
     else:
         print(t("cdn_ligne", statut=statut, cdn=cdn_nom, suite=suite))
 
-
 def afficher_assertions(assert_checks):
-    """Affiche la section Validation HTTP."""
     if not assert_checks:
         return
     print(t("assert_titre"))
@@ -184,7 +198,6 @@ def afficher_assertions(assert_checks):
         print("  " + cle.ljust(largeur) + c["attendu"].ljust(30) + "→  " + c["recu"].ljust(20) + statut)
 
 def afficher_analyse_slo(slo_checks):
-    """Affiche la section SLO Analysis groupée en fin de résultat."""
     if not slo_checks:
         return
     print(t("slo_titre"))
@@ -234,6 +247,168 @@ def afficher_resultat(r, slo_checks=None):
     afficher_analyse_slo(slo_checks)
     print("")
 
+# ── Mesure d'un site (une itération) ─────────────────────────────────────────
+
+def _mesurer_site(site_cfg, args, verify_tls):
+    """Mesure un site et retourne le dict résultat, ou None si aucune donnée."""
+    site    = site_cfg["url"]
+    slo     = site_cfg.get("slo")
+    asserts = site_cfg.get("assert")
+
+    if not (site.startswith("http://") or site.startswith("https://")):
+        print(t("url_invalide", url=site))
+        return {"url": site, "erreur": True, "type_erreur": "url", "message": site}
+
+    hostname = site.split("//")[-1].split("/")[0]
+    is_https = site.startswith("https://")
+    ip_mode  = est_adresse_ip(hostname)
+
+    if ip_mode:
+        port = 443 if is_https else 80
+        joignable, msg = verifier_ip_joignable(hostname, port)
+        if not joignable:
+            print(t("ip_non_joignable", msg=msg))
+            return {"url": site, "erreur": True, "type_erreur": "ip", "message": msg}
+
+    hist_http   = creer_histogramme()
+    mesures_dns = []
+    erreur      = None
+    icmp_result = {}
+    tcp_result  = {}
+    tls_result  = {}
+    tr_result   = {}
+    cdn_result  = {}
+
+    icmp_thread = threading.Thread(
+        target=lambda: icmp_result.update(
+            {"icmp": mesurer_icmp(hostname, nb_mesures=args.nombre)}
+        )
+    )
+    tcp_thread = threading.Thread(
+        target=lambda: tcp_result.update(
+            {"tcp": mesurer_tcp(site, nb_mesures=args.nombre)}
+        )
+    )
+    tls_thread = threading.Thread(
+        target=lambda: tls_result.update(
+            {"tls": mesurer_tls(site, nb_mesures=args.nombre, timeout=args.timeout, verify=verify_tls)}
+        )
+    )
+    tr_thread = threading.Thread(
+        target=lambda: tr_result.update(
+            {"tr": mesurer_traceroute(hostname)}
+        )
+    )
+    cdn_thread = threading.Thread(
+        target=lambda: cdn_result.update(
+            {"cdn": detecter_cdn(site, timeout=args.timeout)}
+        )
+    )
+
+    icmp_thread.start()
+    tcp_thread.start()
+    cdn_thread.start()
+    if is_https:
+        tls_thread.start()
+    if args.traceroute:
+        tr_thread.start()
+
+    with tqdm(
+        total=args.nombre,
+        desc=site,
+        unit="ping",
+        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+        colour='yellow'
+    ) as barre:
+        for _ in range(args.nombre):
+            r = mesurer_site(site, nb_mesures=1, timeout=args.timeout, verify_tls=verify_tls)
+            if r["erreur"]:
+                tqdm.write(site + " -> " + r["message"])
+                erreur = r
+                break
+            hdr_enregistrer(hist_http, r["moyenne"])
+            if r["dns_moyenne"] is not None:
+                mesures_dns.append(r["dns_moyenne"])
+            barre.update(1)
+
+    icmp_thread.join()
+    tcp_thread.join()
+    cdn_thread.join()
+    if is_https:
+        tls_thread.join()
+    if args.traceroute:
+        tr_thread.join()
+
+    if erreur:
+        return erreur
+
+    if hist_http.get_total_count() == 0:
+        return None
+
+    stats      = hdr_stats(hist_http)
+    icmp       = icmp_result.get("icmp")
+    tcp        = tcp_result.get("tcp")
+    tls        = tls_result.get("tls") if is_https else None
+    traceroute = tr_result.get("tr") if args.traceroute else None
+    cdn_info   = cdn_result.get("cdn")
+
+    p50        = stats["p50"]
+    p99        = stats["p99"]
+    tcp_moy    = tcp["moyenne"] if tcp else None
+    tls_moy    = tls["moyenne"] if tls else None
+    surcharge  = round((tcp_moy or 0) + (tls_moy or 0), 1)
+    http_chaud = round(p50 - surcharge, 1) if surcharge > 0 and p50 > surcharge else None
+
+    resultat_final = {
+        "url":         site,
+        "erreur":      False,
+        "type_erreur": None,
+        "message":     None,
+        "nb_mesures":  hist_http.get_total_count(),
+        "ip_mode":     ip_mode,
+        **stats,
+        "dns_moyenne":     round(sum(mesures_dns) / len(mesures_dns), 2) if mesures_dns else None,
+        "dns_min":         min(mesures_dns) if mesures_dns else None,
+        "dns_max":         max(mesures_dns) if mesures_dns else None,
+        "icmp":            icmp,
+        "tcp":             tcp,
+        "tls":             tls,
+        "traceroute":      traceroute,
+        "cdn_info":        cdn_info,
+        "stabilite_ratio": round(p99 / p50, 2) if p50 > 0 else None,
+        "icmp_ms":         icmp["moyenne"] if icmp else None,
+        "tcp_ms":          tcp_moy,
+        "tls_ms":          tls_moy,
+        "http_chaud_ms":   http_chaud,
+        "nb_hops":         traceroute["nb_hops"] if traceroute else None,
+    }
+    slo_checks    = verifier_slo(resultat_final, slo) if slo else None
+    assert_checks = verifier_assertions(site, asserts, timeout=args.timeout) if asserts else None
+    resultat_final["slo_checks"]    = slo_checks
+    resultat_final["assert_checks"] = assert_checks
+
+    return resultat_final
+
+# ── Détection de dégradation ──────────────────────────────────────────────────
+
+def detecter_degradation(current, previous):
+    """Retourne la liste des métriques qui ont augmenté de plus de SEUIL_DEGRADATION."""
+    alertes = []
+    metriques = [
+        ("p50",         current.get("p50"),         previous.get("p50")),
+        ("p95",         current.get("p95"),         previous.get("p95")),
+        ("p99",         current.get("p99"),         previous.get("p99")),
+        ("dns_moyenne", current.get("dns_moyenne"),  previous.get("dns_moyenne")),
+        ("icmp_ms",     current.get("icmp_ms"),     previous.get("icmp_ms")),
+    ]
+    for metric, val_curr, val_prev in metriques:
+        if val_curr is None or val_prev is None or val_prev <= 0:
+            continue
+        delta = (val_curr - val_prev) / val_prev
+        if delta >= SEUIL_DEGRADATION:
+            alertes.append((metric, round(val_prev, 1), round(val_curr, 1), round(delta * 100)))
+    return alertes
+
 # ── Point d'entrée ────────────────────────────────────────────────────────────
 
 def main():
@@ -244,8 +419,8 @@ def main():
         print("Erreur : " + str(e), file=sys.stderr)
         sys.exit(1)
 
-    # Réinitialise le traducteur avec la langue du fichier de config chargé
     t = get_translator(cfg.get("langue", "FR").upper())
+    verify_tls = not args.no_verify_tls
 
     if args.sites:
         sites_config = [{"url": s} for s in args.sites]
@@ -258,146 +433,57 @@ def main():
     cfg_file = args.config_file or config.FICHIER_DEFAUT
     print(t("header", ver=__version__, n=args.nombre, cfg=cfg_file) + "\n")
 
-    resultats = []
+    tous_resultats    = []
+    prev_results      = {}  # {url: resultat} — dernier résultat réussi par site
+    degradation_since = {}  # {url: {metric: heure_str}} — heure de première détection
 
-    for site_cfg in sites_config:
-        site    = site_cfg["url"]
-        slo     = site_cfg.get("slo")
-        asserts = site_cfg.get("assert")
+    iteration = 0
+    try:
+        while True:
+            iteration += 1
+            if args.interval:
+                heure = datetime.now().strftime("%H:%M")
+                print(t("intervalle_titre", n=iteration, heure=heure))
 
-        hist_http   = creer_histogramme()
-        mesures_dns = []
-        erreur      = None
-        icmp_result = {}
-        tcp_result  = {}
-        tls_result  = {}
-        tr_result   = {}
-        cdn_result  = {}
+            for site_cfg in sites_config:
+                r = _mesurer_site(site_cfg, args, verify_tls)
+                if r is None:
+                    continue
 
-        hostname = site.split("//")[-1].split("/")[0]
-        is_https = site.startswith("https://")
+                tous_resultats.append(r)
+                afficher_resultat(r, r.get("slo_checks"))
 
-        if est_adresse_ip(hostname):
-            port = 443 if is_https else 80
-            joignable, msg = verifier_ip_joignable(hostname, port)
-            if not joignable:
-                print(t("ip_non_joignable", msg=msg))
-                resultats.append({"url": site, "erreur": True, "type_erreur": "ip", "message": msg})
-                continue
+                url = r["url"]
+                if args.interval and not r.get("erreur") and url in prev_results:
+                    heure_now = datetime.now().strftime("%H:%M")
+                    alertes   = detecter_degradation(r, prev_results[url])
+                    if alertes:
+                        degraded = set()
+                        for metric, avant, apres, pct in alertes:
+                            nom       = _NOMS_METRIQUES.get(metric, metric)
+                            heure_deg = degradation_since.setdefault(url, {}).setdefault(metric, heure_now)
+                            print(ORANGE + t("degradation_alerte", metric=nom, avant=avant, apres=apres, pct=pct, heure=heure_deg) + RESET)
+                            degraded.add(metric)
+                        for metric in list(degradation_since.get(url, {}).keys()):
+                            if metric not in degraded:
+                                del degradation_since[url][metric]
+                    else:
+                        degradation_since.pop(url, None)
 
-        icmp_thread = threading.Thread(
-            target=lambda: icmp_result.update(
-                {"icmp": mesurer_icmp(hostname, nb_mesures=args.nombre)}
-            )
-        )
-        tcp_thread = threading.Thread(
-            target=lambda: tcp_result.update(
-                {"tcp": mesurer_tcp(site, nb_mesures=args.nombre)}
-            )
-        )
-        verify_tls = not args.no_verify_tls
-        tls_thread = threading.Thread(
-            target=lambda: tls_result.update(
-                {"tls": mesurer_tls(site, nb_mesures=args.nombre, timeout=args.timeout, verify=verify_tls)}
-            )
-        )
-        tr_thread = threading.Thread(
-            target=lambda: tr_result.update(
-                {"tr": mesurer_traceroute(hostname)}
-            )
-        )
-        cdn_thread = threading.Thread(
-            target=lambda: cdn_result.update(
-                {"cdn": detecter_cdn(site, timeout=args.timeout)}
-            )
-        )
+                if not r.get("erreur"):
+                    prev_results[url] = r
 
-        icmp_thread.start()
-        tcp_thread.start()
-        cdn_thread.start()
-        if is_https:
-            tls_thread.start()
-        if args.traceroute:
-            tr_thread.start()
+            if not args.interval:
+                break
 
-        with tqdm(
-            total=args.nombre,
-            desc=site,
-            unit="ping",
-            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
-            colour='yellow'
-        ) as barre:
-            for _ in range(args.nombre):
-                r = mesurer_site(site, nb_mesures=1, timeout=args.timeout, verify_tls=verify_tls)
-                if r["erreur"]:
-                    tqdm.write(site + " -> " + r["message"])
-                    erreur = r
-                    break
-                hdr_enregistrer(hist_http, r["moyenne"])
-                mesures_dns.append(r["dns_moyenne"])
-                barre.update(1)
+            print(t("intervalle_attente", s=args.interval))
+            time.sleep(args.interval)
 
-        icmp_thread.join()
-        tcp_thread.join()
-        cdn_thread.join()
-        if is_https:
-            tls_thread.join()
-        if args.traceroute:
-            tr_thread.join()
+    except KeyboardInterrupt:
+        print()
 
-        if erreur:
-            resultats.append(erreur)
-            continue
-
-        if hist_http.get_total_count() > 0:
-            stats    = hdr_stats(hist_http)
-            icmp      = icmp_result.get("icmp")
-            tcp       = tcp_result.get("tcp")
-            tls       = tls_result.get("tls") if is_https else None
-            traceroute = tr_result.get("tr") if args.traceroute else None
-            cdn_info  = cdn_result.get("cdn")
-
-            p50      = stats["p50"]
-            p99      = stats["p99"]
-            tcp_moy  = tcp["moyenne"] if tcp else None
-            tls_moy  = tls["moyenne"] if tls else None
-            surcharge = round((tcp_moy or 0) + (tls_moy or 0), 1)
-            http_chaud = round(p50 - surcharge, 1) if surcharge > 0 and p50 > surcharge else None
-
-            resultat_final = {
-                "url":        site,
-                "erreur":     False,
-                "type_erreur": None,
-                "message":    None,
-                "nb_mesures": hist_http.get_total_count(),
-                **stats,
-                "dns_moyenne":     round(sum(mesures_dns) / len(mesures_dns), 2),
-                "dns_min":         min(mesures_dns),
-                "dns_max":         max(mesures_dns),
-                # objets complets (pour l'affichage protocoles)
-                "icmp":       icmp,
-                "tcp":        tcp,
-                "tls":        tls,
-                "traceroute": traceroute,
-                "cdn_info":   cdn_info,
-                # clés plates pour le SLO
-                "stabilite_ratio": round(p99 / p50, 2) if p50 > 0 else None,
-                "icmp_ms":         icmp["moyenne"] if icmp else None,
-                "tcp_ms":          tcp_moy,
-                "tls_ms":          tls_moy,
-                "http_chaud_ms":   http_chaud,
-                "nb_hops":         traceroute["nb_hops"] if traceroute else None,
-            }
-            slo_checks    = verifier_slo(resultat_final, slo) if slo else None
-            assert_checks = verifier_assertions(site, asserts, timeout=args.timeout) if asserts else None
-            resultat_final["slo_checks"]    = slo_checks
-            resultat_final["assert_checks"] = assert_checks
-
-            resultats.append(resultat_final)
-            afficher_resultat(resultat_final, slo_checks)
-
-    if args.csv and resultats:
-        fichier = sauvegarder_csv(resultats)
+    if args.csv and tous_resultats:
+        fichier = sauvegarder_csv(tous_resultats)
         print(t("csv_sauvegarde", f=fichier))
 
 if __name__ == "__main__":
