@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import os
 import pytest
-from ping_tool.core import mesurer_site, sauvegarder_csv, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions
-from ping_tool.i18n import get_translator
+from ltiprobe.core import mesurer_site, sauvegarder_csv, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions
+from ltiprobe.i18n import get_translator
 
 
 def test_i18n_fr_header():
@@ -22,7 +22,7 @@ def test_i18n_langue_inconnue_repli_fr():
 
 def test_i18n_cles_identiques():
     """FR et EN doivent avoir exactement les mêmes clés."""
-    from ping_tool.i18n import _TRANSLATIONS
+    from ltiprobe.i18n import _TRANSLATIONS
     assert set(_TRANSLATIONS["FR"].keys()) == set(_TRANSLATIONS["EN"].keys())
 
 def test_verifier_assertions_status_ok():
@@ -134,7 +134,7 @@ def test_config_yaml(tmp_path):
         "    slo:\n"
         "      http_p50_ms: 100\n"
     )
-    config_file = tmp_path / "ping-tool.yaml"
+    config_file = tmp_path / "ltiprobe.yaml"
     config_file.write_text(yaml_content, encoding="utf-8")
 
     import yaml
@@ -151,14 +151,14 @@ _CLES_SLO_VALIDES = {
     "http_chaud_ms", "nb_hops_max",
 }
 
-def test_ping_tool_yaml_existe():
-    """Le fichier ping-tool.yaml doit exister à la racine du projet."""
-    assert os.path.exists("ping-tool.yaml"), "ping-tool.yaml introuvable à la racine"
+def test_ltiprobe_yaml_existe():
+    """Le fichier ltiprobe.yaml doit exister à la racine du projet."""
+    assert os.path.exists("ltiprobe.yaml"), "ltiprobe.yaml introuvable à la racine"
 
-def test_ping_tool_yaml_structure():
-    """ping-tool.yaml doit avoir les clés obligatoires avec les bons types."""
+def test_ltiprobe_yaml_structure():
+    """ltiprobe.yaml doit avoir les clés obligatoires avec les bons types."""
     import yaml
-    with open("ping-tool.yaml", encoding="utf-8") as f:
+    with open("ltiprobe.yaml", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     assert isinstance(data.get("nb_mesures"), int), "nb_mesures doit être un entier"
@@ -168,10 +168,10 @@ def test_ping_tool_yaml_structure():
     assert isinstance(data.get("sites"), list), "sites doit être une liste"
     assert len(data["sites"]) > 0, "sites ne doit pas être vide"
 
-def test_ping_tool_yaml_sites():
-    """Chaque site dans ping-tool.yaml doit avoir une URL valide."""
+def test_ltiprobe_yaml_sites():
+    """Chaque site dans ltiprobe.yaml doit avoir une URL valide."""
     import yaml
-    with open("ping-tool.yaml", encoding="utf-8") as f:
+    with open("ltiprobe.yaml", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     for site in data["sites"]:
@@ -180,10 +180,10 @@ def test_ping_tool_yaml_sites():
         assert url.startswith("http://") or url.startswith("https://"), \
             f"URL invalide (doit commencer par http:// ou https://) : {url}"
 
-def test_ping_tool_yaml_slo_cles():
-    """Les clés SLO dans ping-tool.yaml doivent être reconnues par verifier_slo."""
+def test_ltiprobe_yaml_slo_cles():
+    """Les clés SLO dans ltiprobe.yaml doivent être reconnues par verifier_slo."""
     import yaml
-    with open("ping-tool.yaml", encoding="utf-8") as f:
+    with open("ltiprobe.yaml", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
     for site in data["sites"]:
@@ -199,7 +199,7 @@ def test_ping_tool_yaml_slo_cles():
 
 def test_mesurer_tcp_valide():
     """Un hôte accessible doit retourner des RTTs TCP positifs."""
-    from ping_tool.core import mesurer_tcp
+    from ltiprobe.core import mesurer_tcp
     r = mesurer_tcp("https://google.com", nb_mesures=2)
     assert r is not None
     assert r["moyenne"] > 0
@@ -209,13 +209,13 @@ def test_mesurer_tcp_valide():
 
 def test_mesurer_tcp_invalide():
     """Un hôte inexistant doit retourner None."""
-    from ping_tool.core import mesurer_tcp
+    from ltiprobe.core import mesurer_tcp
     r = mesurer_tcp("https://hote.inexistant.invalid", nb_mesures=1)
     assert r is None
 
 def test_mesurer_tls_valide():
     """Un site HTTPS accessible doit retourner des temps de handshake positifs."""
-    from ping_tool.core import mesurer_tls
+    from ltiprobe.core import mesurer_tls
     r = mesurer_tls("https://google.com", nb_mesures=2)
     assert r is not None
     assert r["moyenne"] > 0
@@ -225,7 +225,7 @@ def test_mesurer_tls_valide():
 @pytest.mark.skipif(os.getenv("CI") == "true", reason="traceroute bloqué en CI")
 def test_mesurer_traceroute_valide():
     """Un hôte accessible doit retourner un nombre de hops positif."""
-    from ping_tool.core import mesurer_traceroute
+    from ltiprobe.core import mesurer_traceroute
     r = mesurer_traceroute("google.com", max_hops=30)
     assert r is not None
     assert r["nb_hops"] > 0
@@ -235,20 +235,20 @@ def test_mesurer_traceroute_valide():
 
 def test_mesurer_traceroute_invalide():
     """Un hôte inexistant doit retourner None."""
-    from ping_tool.core import mesurer_traceroute
+    from ltiprobe.core import mesurer_traceroute
     r = mesurer_traceroute("hote.inexistant.invalid", max_hops=3)
     assert r is None
 
 def test_mesurer_tls_invalide():
     """Un hôte inexistant doit retourner None."""
-    from ping_tool.core import mesurer_tls
+    from ltiprobe.core import mesurer_tls
     r = mesurer_tls("https://hote.inexistant.invalid", nb_mesures=1)
     assert r is None
 
 @pytest.mark.skipif(os.getenv("CI") == "true", reason="ICMP bloqué en CI")
 def test_mesurer_icmp_valide():
     """Un hôte accessible doit retourner des RTTs positifs."""
-    from ping_tool.core import mesurer_icmp
+    from ltiprobe.core import mesurer_icmp
     r = mesurer_icmp("google.com", nb_mesures=2)
     assert r is not None
     assert r["moyenne"] > 0
@@ -257,13 +257,13 @@ def test_mesurer_icmp_valide():
 
 def test_mesurer_icmp_invalide():
     """Un hôte inexistant doit retourner None."""
-    from ping_tool.core import mesurer_icmp
+    from ltiprobe.core import mesurer_icmp
     r = mesurer_icmp("hote.inexistant.invalid", nb_mesures=1)
     assert r is None
 
 def test_detecter_cdn_retourne_dict():
     """detecter_cdn sur un site accessible doit retourner un dict avec les clés attendues."""
-    from ping_tool.core import detecter_cdn
+    from ltiprobe.core import detecter_cdn
     r = detecter_cdn("https://google.com")
     assert r is not None
     for cle in ("cdn", "cache", "age_s", "pop", "via"):
@@ -271,13 +271,13 @@ def test_detecter_cdn_retourne_dict():
 
 def test_detecter_cdn_invalide():
     """Un hôte inexistant doit retourner None."""
-    from ping_tool.core import detecter_cdn
+    from ltiprobe.core import detecter_cdn
     r = detecter_cdn("https://hote.inexistant.invalid")
     assert r is None
 
 def test_detecter_cdn_cloudflare():
     """Un site derrière Cloudflare doit être détecté."""
-    from ping_tool.core import detecter_cdn
+    from ltiprobe.core import detecter_cdn
     r = detecter_cdn("https://www.cloudflare.com")
     assert r is not None
     assert r["cdn"] == "Cloudflare"
@@ -294,14 +294,14 @@ def test_mesurer_site_valide():
 
 def test_mesurer_dns_valide():
     """La resolution DNS d'un site valide doit reussir."""
-    from ping_tool.core import mesurer_dns
+    from ltiprobe.core import mesurer_dns
     ms = mesurer_dns("google.com")
     assert ms is not None
     assert ms > 0
 
 def test_mesurer_dns_invalide():
     """La resolution DNS d'un faux site doit retourner None."""
-    from ping_tool.core import mesurer_dns
+    from ltiprobe.core import mesurer_dns
     ms = mesurer_dns("slkjddslfj.com")
     assert ms is None
 

@@ -3,9 +3,9 @@ import argparse
 import sys
 import threading
 from tqdm import tqdm
-from ping_tool import config
-from ping_tool.i18n import get_translator
-from ping_tool.core import (
+from ltiprobe import config
+from ltiprobe.i18n import get_translator
+from ltiprobe.core import (
     mesurer_site, sauvegarder_csv,
     creer_histogramme, hdr_enregistrer, hdr_stats,
     verifier_slo, verifier_assertions,
@@ -35,10 +35,10 @@ def parse_arguments():
     cfg = config.charger(pre_args.config_file)
 
     parser = argparse.ArgumentParser(
-        prog="ping-tool",
+        prog="ltiprobe",
         description="Mesure les temps de reponse HTTP de sites web"
     )
-    parser.add_argument("--version", action="version", version="ping-tool 0.2.1")
+    parser.add_argument("--version", action="version", version="ltiprobe 0.3.0")
     parser.add_argument(
         "--config-file",
         default=None,

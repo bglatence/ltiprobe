@@ -1,4 +1,4 @@
-# Roadmap ping-tool
+# Roadmap ltiprobe
 
 Évolutions potentielles identifiées par analyse comparative avec des outils similaires
 (hey, vegeta, mtr, blackbox_exporter, curl, gping, k6).
@@ -28,7 +28,7 @@ Actuellement, le HTTP p50 mélange les deux phases.
 Relancer les mesures toutes les N secondes avec détection automatique de dégradation.
 
 ```bash
-ping-tool --interval 60   # mesure toutes les 60 secondes
+ltiprobe --interval 60   # mesure toutes les 60 secondes
 ```
 
 Afficher une alerte si un percentile dépasse un seuil ou s'écarte significativement
@@ -80,13 +80,13 @@ Générer un fichier `.prom` ou exposer un endpoint `/metrics` pour intégration
 dans Grafana/Prometheus sans redéveloppement.
 
 ```bash
-ping-tool --prometheus-out metrics.prom
+ltiprobe --prometheus-out metrics.prom
 ```
 
 ```
-# HELP ping_tool_http_p50_ms HTTP latency p50
-# TYPE ping_tool_http_p50_ms gauge
-ping_tool_http_p50_ms{url="https://google.com"} 38.0
+# HELP ltiprobe_http_p50_ms HTTP latency p50
+# TYPE ltiprobe_http_p50_ms gauge
+ltiprobe_http_p50_ms{url="https://google.com"} 38.0
 ```
 
 ---
@@ -158,7 +158,7 @@ Simuler N utilisateurs simultanés pour observer la dégradation de latence sous
 Différent des mesures séquentielles actuelles.
 
 ```bash
-ping-tool --concurrent 10 --rate 50/s -n 1000
+ltiprobe --concurrent 10 --rate 50/s -n 1000
 ```
 
 ---
@@ -179,8 +179,8 @@ Sélectionner un fichier de configuration différent selon l'environnement,
 pour comparer facilement staging vs production.
 
 ```bash
-ping-tool --config-file prod.yaml
-ping-tool --config-file staging.yaml
+ltiprobe --config-file prod.yaml
+ltiprobe --config-file staging.yaml
 ```
 
 ---
@@ -206,7 +206,7 @@ Utile pour valider que la politique HTTPS est bien en place (HSTS, redirection f
 
 ### 13. Webhook d'alerte SLO
 Envoyer une notification HTTP (Slack, PagerDuty, Teams, webhook générique)
-quand un SLO est violé. Transforme ping-tool en sonde d'alerte légère.
+quand un SLO est violé. Transforme ltiprobe en sonde d'alerte légère.
 
 ```yaml
 alerting:
@@ -216,9 +216,9 @@ alerting:
 
 ---
 
-## Ce que ping-tool fait déjà mieux que la plupart des outils comparés
+## Ce que ltiprobe fait déjà mieux que la plupart des outils comparés
 
-| Fonctionnalité | ping-tool | hey | mtr | blackbox_exporter | curl |
+| Fonctionnalité | ltiprobe | hey | mtr | blackbox_exporter | curl |
 |---|:---:|:---:|:---:|:---:|:---:|
 | Décomposition ICMP / TCP / TLS / HTTP | ✓ | — | partiel | partiel | partiel |
 | SLOs par site avec seuils configurables | ✓ | — | — | ✓ | — |
