@@ -274,10 +274,16 @@ def main():
         tr_result   = {}
         cdn_result  = {}
 
+        if not (site.startswith("http://") or site.startswith("https://")):
+            print(t("url_invalide", url=site))
+            resultats.append({"url": site, "erreur": True, "type_erreur": "url", "message": site})
+            continue
+
         hostname = site.split("//")[-1].split("/")[0]
         is_https = site.startswith("https://")
+        ip_mode  = est_adresse_ip(hostname)
 
-        if est_adresse_ip(hostname):
+        if ip_mode:
             port = 443 if is_https else 80
             joignable, msg = verifier_ip_joignable(hostname, port)
             if not joignable:
@@ -334,7 +340,8 @@ def main():
                     erreur = r
                     break
                 hdr_enregistrer(hist_http, r["moyenne"])
-                mesures_dns.append(r["dns_moyenne"])
+                if r["dns_moyenne"] is not None:
+                    mesures_dns.append(r["dns_moyenne"])
                 barre.update(1)
 
         icmp_thread.join()
@@ -370,10 +377,11 @@ def main():
                 "type_erreur": None,
                 "message":    None,
                 "nb_mesures": hist_http.get_total_count(),
+                "ip_mode":    ip_mode,
                 **stats,
-                "dns_moyenne":     round(sum(mesures_dns) / len(mesures_dns), 2),
-                "dns_min":         min(mesures_dns),
-                "dns_max":         max(mesures_dns),
+                "dns_moyenne":     round(sum(mesures_dns) / len(mesures_dns), 2) if mesures_dns else None,
+                "dns_min":         min(mesures_dns) if mesures_dns else None,
+                "dns_max":         max(mesures_dns) if mesures_dns else None,
                 # objets complets (pour l'affichage protocoles)
                 "icmp":       icmp,
                 "tcp":        tcp,
