@@ -261,6 +261,22 @@ def test_mesurer_icmp_invalide():
     r = mesurer_icmp("hote.inexistant.invalid", nb_mesures=1)
     assert r is None
 
+def test_est_adresse_ip():
+    """est_adresse_ip doit distinguer IP et nom de domaine."""
+    from ltiprobe.core import est_adresse_ip
+    assert est_adresse_ip("8.8.8.8")
+    assert est_adresse_ip("2001:4860:4860::8888")  # IPv6
+    assert not est_adresse_ip("google.com")
+    assert not est_adresse_ip("192.168.x.x")  # invalide
+
+def test_mesurer_site_ip_dns_na():
+    """Un site accédé par IP ne doit pas avoir de mesure DNS."""
+    r = mesurer_site("http://93.184.216.34", nb_mesures=1)
+    # Succès ou erreur réseau selon l'environnement, mais jamais d'erreur DNS
+    if not r["erreur"]:
+        assert r["ip_mode"] is True
+        assert r["dns_moyenne"] is None
+
 def test_detecter_cdn_retourne_dict():
     """detecter_cdn sur un site accessible doit retourner un dict avec les clés attendues."""
     from ltiprobe.core import detecter_cdn
