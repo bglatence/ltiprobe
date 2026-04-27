@@ -26,6 +26,11 @@ langue: EN
 #   tls_ms          — latence handshake TLS moyenne
 #   http_chaud_ms   — latence HTTP estimée keep-alive (sans TCP/TLS)
 #   nb_hops_max     — nombre de hops maximum (requiert --traceroute)
+#
+# Assertions de validation HTTP (clé "assert") :
+#   status_code     — code HTTP attendu (ex: 200)
+#   body_contains   — chaîne attendue dans les premiers 4 Ko du body
+#   header          — "Clé: Valeur" ou "Clé" (vérifie la présence)
 sites:
   - url: https://google.com
     slo:
@@ -34,6 +39,9 @@ sites:
       dns_ms: 50
       stabilite_ratio: 5
       tls_ms: 80
+    assert:
+      status_code: 200
+      body_contains: "google"
 
   - url: https://www.latencetech.com
     slo:

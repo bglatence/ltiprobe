@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pytest
-from ping_tool.core import mesurer_site, sauvegarder_csv, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo
+from ping_tool.core import mesurer_site, sauvegarder_csv, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions
 from ping_tool.i18n import get_translator
 
 
@@ -24,6 +24,37 @@ def test_i18n_cles_identiques():
     """FR et EN doivent avoir exactement les mêmes clés."""
     from ping_tool.i18n import _TRANSLATIONS
     assert set(_TRANSLATIONS["FR"].keys()) == set(_TRANSLATIONS["EN"].keys())
+
+def test_verifier_assertions_status_ok():
+    """Un site retournant 200 doit valider status_code: 200."""
+    checks = verifier_assertions("https://google.com", {"status_code": 200})
+    assert "_erreur" not in checks
+    assert checks["status_code"]["ok"]
+
+def test_verifier_assertions_status_violation():
+    """Un status_code incorrect doit être marqué en violation."""
+    checks = verifier_assertions("https://google.com", {"status_code": 999})
+    assert not checks["status_code"]["ok"]
+
+def test_verifier_assertions_body_contains_ok():
+    """La recherche d'un mot présent dans le body doit réussir."""
+    checks = verifier_assertions("https://google.com", {"body_contains": "google"})
+    assert checks["body_contains"]["ok"]
+
+def test_verifier_assertions_body_contains_violation():
+    """La recherche d'un mot absent doit échouer."""
+    checks = verifier_assertions("https://google.com", {"body_contains": "xyzxyzxyz_absent_xyzxyz"})
+    assert not checks["body_contains"]["ok"]
+
+def test_verifier_assertions_host_invalide():
+    """Un hôte inexistant doit retourner une erreur."""
+    checks = verifier_assertions("https://hote.inexistant.invalid", {"status_code": 200})
+    assert "_erreur" in checks
+
+def test_verifier_assertions_vide():
+    """Des assertions vides doivent retourner un dict vide."""
+    checks = verifier_assertions("https://google.com", {})
+    assert checks == {}
 
 def test_hdr_stats_percentiles_croissants():
     """Les percentiles doivent être croissants."""
