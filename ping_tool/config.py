@@ -2,12 +2,12 @@
 import os
 import yaml
 
-_CONFIG_FILE = "ping-tool.yaml"
+FICHIER_DEFAUT = "ping-tool.yaml"
 
 _DEFAULTS = {
     "nb_mesures": 10,
-    "timeout": 10,
-    "langue": "FR",
+    "timeout":    10,
+    "langue":     "FR",
     "sites": [
         {"url": "https://google.com"},
         {"url": "https://github.com"},
@@ -16,14 +16,23 @@ _DEFAULTS = {
     ],
 }
 
-def _charger():
-    if os.path.exists(_CONFIG_FILE):
-        with open(_CONFIG_FILE, encoding="utf-8") as f:
+def charger(filepath=None):
+    """Charge la configuration depuis un fichier YAML.
+
+    Utilise FICHIER_DEFAUT si filepath est None ou absent.
+    Retourne un dict fusionné avec les valeurs par défaut.
+    """
+    path = filepath or FICHIER_DEFAUT
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
         return {**_DEFAULTS, **data}
+    if filepath:
+        raise FileNotFoundError(f"Fichier de configuration introuvable : {filepath}")
     return _DEFAULTS.copy()
 
-_cfg = _charger()
+# Chargement initial depuis le fichier par défaut (pour compatibilité imports directs)
+_cfg = charger()
 
 NB_MESURES   = _cfg["nb_mesures"]
 TIMEOUT      = _cfg["timeout"]
