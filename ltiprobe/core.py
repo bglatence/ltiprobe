@@ -3,6 +3,7 @@ import urllib.request
 import urllib.error
 import socket
 import ssl
+import ipaddress
 import subprocess
 import re
 import time
@@ -10,6 +11,32 @@ import csv
 from datetime import datetime
 from hdrh.histogram import HdrHistogram
 from . import config
+
+
+def est_adresse_ip(hostname: str) -> bool:
+    """Retourne True si hostname est une adresse IPv4 ou IPv6."""
+    try:
+        ipaddress.ip_address(hostname)
+        return True
+    except ValueError:
+        return False
+
+def verifier_ip_joignable(hostname, port, timeout=3):
+    """Vérifie rapidement qu'une adresse IP est joignable via TCP.
+
+    Retourne (True, None) si joignable, (False, message) sinon.
+    Utilisé uniquement pour les adresses IP directes avant les mesures.
+    """
+    try:
+        sock = socket.create_connection((hostname, port), timeout=timeout)
+        sock.close()
+        return True, None
+    except socket.timeout:
+        return False, f"{hostname}:{port} — délai dépassé (hôte non joignable)"
+    except ConnectionRefusedError:
+        return False, f"{hostname}:{port} — connexion refusée (port fermé)"
+    except OSError as e:
+        return False, f"{hostname}:{port} — {e.strerror}"
 
 # 1µs → 60s, 3 chiffres significatifs
 _HDR_MIN_US = 1
@@ -276,14 +303,19 @@ def mesurer_traceroute(hostname, max_hops=30):
     except Exception:
         return None
 
-def mesurer_tls(hostname, nb_mesures=5, timeout=10):
+def mesurer_tls(hostname, nb_mesures=5, timeout=10, verify=True):
     """Mesure la latence du handshake TLS seul (après TCP connect).
 
-    Retourne un dict {moyenne, min, max, p50, nb} en ms,
-    ou None si le site n'est pas HTTPS ou si TLS échoue.
+    verify=False désactive la validation du certificat (utile pour les IPs).
+    Retourne un dict {moyenne, min, max, p50, nb} en ms, ou None si échec.
     """
     hostname = hostname.replace("https://", "").replace("http://", "").split("/")[0]
-    ctx = ssl.create_default_context()
+    if verify:
+        ctx = ssl.create_default_context()
+    else:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
     rtts = []
     hist = creer_histogramme()
     for _ in range(nb_mesures):
@@ -354,7 +386,7 @@ def extraire_hostname(url):
     url = url.replace("https://", "").replace("http://", "")
     return url.split("/")[0]
 
-def mesurer_site(url, nb_mesures=None, timeout=None):
+def mesurer_site(url, nb_mesures=None, timeout=None, verify_tls=True):
     """Mesure le temps de reponse HTTP et DNS d'un site. Retourne un dict."""
     nb = nb_mesures or config.NB_MESURES
     to = timeout or config.TIMEOUT
@@ -362,23 +394,31 @@ def mesurer_site(url, nb_mesures=None, timeout=None):
     mesures_dns = []
 
     hostname = extraire_hostname(url)
+    ip_mode = est_adresse_ip(hostname)
 
     for _ in range(nb):
-        # Mesure DNS
-        dns_ms = mesurer_dns(hostname)
-        if dns_ms is None:
-            return {
-                "url": url,
-                "erreur": True,
-                "type_erreur": "dns",
-                "message": "Impossible de resoudre l'adresse du site : " + url
-            }
-        mesures_dns.append(dns_ms)
+        # Mesure DNS — ignorée pour les adresses IP directes
+        if not ip_mode:
+            dns_ms = mesurer_dns(hostname)
+            if dns_ms is None:
+                return {
+                    "url": url,
+                    "erreur": True,
+                    "type_erreur": "dns",
+                    "message": "Impossible de resoudre l'adresse du site : " + url
+                }
+            mesures_dns.append(dns_ms)
 
         # Mesure HTTP — enregistrement direct dans l'histogramme
         debut = time.perf_counter()
         try:
-            urllib.request.urlopen(url, timeout=to)
+            if not verify_tls:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                urllib.request.urlopen(url, timeout=to, context=ctx)
+            else:
+                urllib.request.urlopen(url, timeout=to)
             ms = round((time.perf_counter() - debut) * 1000, 2)
             hdr_enregistrer(hist_http, ms)
 
@@ -412,12 +452,13 @@ def mesurer_site(url, nb_mesures=None, timeout=None):
         "erreur": False,
         "type_erreur": None,
         "message": None,
+        "ip_mode": ip_mode,
         # HTTP
         **stats,
-        # DNS
-        "dns_moyenne": round(sum(mesures_dns) / len(mesures_dns), 2),
-        "dns_min":     min(mesures_dns),
-        "dns_max":     max(mesures_dns),
+        # DNS — None si adresse IP directe
+        "dns_moyenne": round(sum(mesures_dns) / len(mesures_dns), 2) if mesures_dns else None,
+        "dns_min":     min(mesures_dns) if mesures_dns else None,
+        "dns_max":     max(mesures_dns) if mesures_dns else None,
     }
 
 def sauvegarder_csv(resultats, fichier=None):

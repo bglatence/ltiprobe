@@ -3,14 +3,14 @@ import argparse
 import sys
 import threading
 from tqdm import tqdm
-from ltiprobe import config
+from ltiprobe import config, __version__
 from ltiprobe.i18n import get_translator
 from ltiprobe.core import (
     mesurer_site, sauvegarder_csv,
     creer_histogramme, hdr_enregistrer, hdr_stats,
     verifier_slo, verifier_assertions,
     mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute,
-    detecter_cdn,
+    detecter_cdn, est_adresse_ip, verifier_ip_joignable,
     SLO_UNITES,
 )
 
@@ -38,7 +38,7 @@ def parse_arguments():
         prog="ltiprobe",
         description="Mesure les temps de reponse HTTP de sites web"
     )
-    parser.add_argument("--version", action="version", version="ltiprobe 0.3.0")
+    parser.add_argument("--version", action="version", version=f"ltiprobe {__version__}")
     parser.add_argument(
         "--config-file",
         default=None,
@@ -61,6 +61,8 @@ def parse_arguments():
     )
     parser.add_argument("--traceroute", action="store_true",
         help="Afficher le nombre de hops reseau vers chaque site")
+    parser.add_argument("--no-verify-tls", action="store_true",
+        help="Desactiver la validation du certificat TLS (utile pour les adresses IP)")
     return parser.parse_args(), cfg
 
 # ── Indicateurs colorés ───────────────────────────────────────────────────────
@@ -216,7 +218,10 @@ def afficher_resultat(r, slo_checks=None):
     print(t("p99",  v=r["p99"]))
     print(t("p999", v=r["p999"]))
     print(t("stabilite") + indicateur_stabilite(r["p50"], r["p99"]))
-    print(t("dns", v=r["dns_moyenne"], min=r["dns_min"], max=r["dns_max"]))
+    if r.get("ip_mode"):
+        print(t("dns_ip_na"))
+    else:
+        print(t("dns", v=r["dns_moyenne"], min=r["dns_min"], max=r["dns_max"]))
 
     if r.get("traceroute") is not None:
         afficher_traceroute(r["traceroute"])
@@ -251,7 +256,7 @@ def main():
         ]
 
     cfg_file = args.config_file or config.FICHIER_DEFAUT
-    print(t("header", ver="0.3.0", n=args.nombre, cfg=cfg_file) + "\n")
+    print(t("header", ver=__version__, n=args.nombre, cfg=cfg_file) + "\n")
 
     resultats = []
 
@@ -272,6 +277,14 @@ def main():
         hostname = site.split("//")[-1].split("/")[0]
         is_https = site.startswith("https://")
 
+        if est_adresse_ip(hostname):
+            port = 443 if is_https else 80
+            joignable, msg = verifier_ip_joignable(hostname, port)
+            if not joignable:
+                print(t("ip_non_joignable", msg=msg))
+                resultats.append({"url": site, "erreur": True, "type_erreur": "ip", "message": msg})
+                continue
+
         icmp_thread = threading.Thread(
             target=lambda: icmp_result.update(
                 {"icmp": mesurer_icmp(hostname, nb_mesures=args.nombre)}
@@ -282,9 +295,10 @@ def main():
                 {"tcp": mesurer_tcp(site, nb_mesures=args.nombre)}
             )
         )
+        verify_tls = not args.no_verify_tls
         tls_thread = threading.Thread(
             target=lambda: tls_result.update(
-                {"tls": mesurer_tls(site, nb_mesures=args.nombre, timeout=args.timeout)}
+                {"tls": mesurer_tls(site, nb_mesures=args.nombre, timeout=args.timeout, verify=verify_tls)}
             )
         )
         tr_thread = threading.Thread(
@@ -314,7 +328,7 @@ def main():
             colour='yellow'
         ) as barre:
             for _ in range(args.nombre):
-                r = mesurer_site(site, nb_mesures=1, timeout=args.timeout)
+                r = mesurer_site(site, nb_mesures=1, timeout=args.timeout, verify_tls=verify_tls)
                 if r["erreur"]:
                     tqdm.write(site + " -> " + r["message"])
                     erreur = r
