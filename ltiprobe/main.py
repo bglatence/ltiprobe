@@ -10,7 +10,7 @@ from ltiprobe.core import (
     creer_histogramme, hdr_enregistrer, hdr_stats,
     verifier_slo, verifier_assertions,
     mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute,
-    detecter_cdn, est_adresse_ip,
+    detecter_cdn, est_adresse_ip, verifier_ip_joignable,
     SLO_UNITES,
 )
 
@@ -276,6 +276,14 @@ def main():
 
         hostname = site.split("//")[-1].split("/")[0]
         is_https = site.startswith("https://")
+
+        if est_adresse_ip(hostname):
+            port = 443 if is_https else 80
+            joignable, msg = verifier_ip_joignable(hostname, port)
+            if not joignable:
+                print(t("ip_non_joignable", msg=msg))
+                resultats.append({"url": site, "erreur": True, "type_erreur": "ip", "message": msg})
+                continue
 
         icmp_thread = threading.Thread(
             target=lambda: icmp_result.update(

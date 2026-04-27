@@ -21,6 +21,23 @@ def est_adresse_ip(hostname: str) -> bool:
     except ValueError:
         return False
 
+def verifier_ip_joignable(hostname, port, timeout=3):
+    """Vérifie rapidement qu'une adresse IP est joignable via TCP.
+
+    Retourne (True, None) si joignable, (False, message) sinon.
+    Utilisé uniquement pour les adresses IP directes avant les mesures.
+    """
+    try:
+        sock = socket.create_connection((hostname, port), timeout=timeout)
+        sock.close()
+        return True, None
+    except socket.timeout:
+        return False, f"{hostname}:{port} — délai dépassé (hôte non joignable)"
+    except ConnectionRefusedError:
+        return False, f"{hostname}:{port} — connexion refusée (port fermé)"
+    except OSError as e:
+        return False, f"{hostname}:{port} — {e.strerror}"
+
 # 1µs → 60s, 3 chiffres significatifs
 _HDR_MIN_US = 1
 _HDR_MAX_US = 60_000_000

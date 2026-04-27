@@ -261,6 +261,20 @@ def test_mesurer_icmp_invalide():
     r = mesurer_icmp("hote.inexistant.invalid", nb_mesures=1)
     assert r is None
 
+def test_verifier_ip_joignable_ok():
+    """Une IP publique accessible sur le port 443 doit être joignable."""
+    from ltiprobe.core import verifier_ip_joignable
+    ok, msg = verifier_ip_joignable("8.8.8.8", 443)
+    assert ok
+    assert msg is None
+
+def test_verifier_ip_joignable_echec():
+    """Une IP non routable doit retourner non joignable rapidement."""
+    from ltiprobe.core import verifier_ip_joignable
+    ok, msg = verifier_ip_joignable("192.168.99.99", 80, timeout=2)
+    assert not ok
+    assert msg is not None
+
 def test_est_adresse_ip():
     """est_adresse_ip doit distinguer IP et nom de domaine."""
     from ltiprobe.core import est_adresse_ip
