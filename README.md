@@ -1,7 +1,7 @@
 # ping-tool
 
 Mesure les temps de réponse HTTP, DNS, ICMP, TCP et TLS de sites web depuis le Terminal.
-Affiche une distribution complète des latences (P50 à P99.9) avec vérification des SLOs.
+Affiche une distribution complète des latences (P50 à P99.9) avec vérification des SLOs et détection CDN/cache.
 
 [![PyPI version](https://badge.fury.io/py/ping-tool-bglatence.svg)](https://pypi.org/project/ping-tool-bglatence/)
 
@@ -28,6 +28,12 @@ ping-tool --csv
 
 # Afficher le nombre de hops réseau (traceroute)
 ping-tool --traceroute
+
+# Afficher le nombre de hops réseau (traceroute)
+ping-tool --traceroute
+
+# Utiliser un fichier de configuration alternatif
+ping-tool --config-file staging.yaml
 
 # Aide
 ping-tool --help
@@ -59,6 +65,20 @@ https://google.com
   TLS   (handshake, ×1)   :  31.2 ms  min: 28.4  max: 35.1  (+12.5 ms)
   HTTP  (p50, froid)      :  38.0 ms  (+6.8 ms)
   HTTP  (p50, keep-alive) :  19.3 ms  ← sans TCP/TLS
+
+  ── Cache / CDN ──────────────────────────────────────
+  Cache  →  HIT  Cloudflare  PoP: YYZ  Age: 42s
+
+  ── Validation HTTP ──────────────────────────────────
+  status_code     200                           →  200               ✓ OK
+  body_contains   "google"                      →  trouvé            ✓ OK
+
+  ── Analyse SLO ─────────────────────────────────────
+  http_p50_ms        38.0 ms  <=  300 ms        ✓ OK
+  http_p95_ms        89.0 ms  <=  400 ms        ✓ OK
+  dns_ms              8.2 ms  <=   50 ms        ✓ OK
+  ────────────────────────────────────────────────────
+  Bilan : 3/3 objectifs respectés
 ```
 
 ## Configuration
@@ -88,6 +108,31 @@ sites:
 
 Si le fichier est absent, ping-tool démarre avec des sites et valeurs par défaut.
 
+### Options de configuration complètes
+
+```yaml
+nb_mesures: 10          # nombre de mesures par site
+timeout: 10             # timeout HTTP en secondes
+langue: FR              # FR (défaut) ou EN
+
+sites:
+  - url: https://api.exemple.com/health
+    slo:
+      http_p50_ms: 200      # latence HTTP médiane max
+      http_p95_ms: 400      # latence HTTP P95 max
+      dns_ms: 50            # latence DNS moyenne max
+      tls_ms: 80            # handshake TLS max
+      icmp_ms: 30           # latence réseau (ICMP) max
+      tcp_ms: 40            # handshake TCP max
+      http_chaud_ms: 150    # HTTP keep-alive (sans TCP/TLS) max
+      stabilite_ratio: 5    # ratio P99/P50 max
+      nb_hops_max: 25       # nombre de hops réseau max (--traceroute)
+    assert:
+      status_code: 200              # code HTTP attendu
+      body_contains: "ok"           # chaîne attendue dans le body
+      header: "Content-Type: application/json"  # header obligatoire
+```
+
 ### Clés SLO disponibles
 
 | Clé | Description |
@@ -99,6 +144,22 @@ Si le fichier est absent, ping-tool démarre avec des sites et valeurs par défa
 | `http_p99_ms` | Latence HTTP P99 |
 | `http_p999_ms` | Latence HTTP P99.9 |
 | `dns_ms` | Latence DNS moyenne |
+| `tls_ms` | Durée du handshake TLS |
+| `icmp_ms` | Latence réseau ICMP moyenne |
+| `tcp_ms` | Durée du handshake TCP |
+| `http_chaud_ms` | HTTP estimé keep-alive (sans TCP/TLS) |
+| `stabilite_ratio` | Ratio P99/P50 (ex: `5` signifie P99 ≤ 5× P50) |
+| `nb_hops_max` | Nombre de hops réseau max (requiert `--traceroute`) |
+
+### Validation de la réponse HTTP (`assert`)
+
+Chaque site peut déclarer des assertions vérifiées après la mesure :
+
+| Clé | Description |
+|---|---|
+| `status_code` | Code HTTP attendu (ex: `200`) |
+| `body_contains` | Chaîne attendue dans les premiers 4 Ko du body |
+| `header` | `"Clé: Valeur"` (valeur partielle) ou `"Clé"` (présence) |
 
 ## Comparaison des couches protocolaires
 
@@ -137,6 +198,31 @@ Le flag `--traceroute` affiche le nombre de hops entre vous et le serveur :
 | > 35 | Critique — route sous-optimale ou problème de routage |
 
 Les hops masqués (`* * *`) sont comptabilisés mais signalés séparément.
+
+## Détection CDN et statut cache
+
+Pour chaque site, ping-tool envoie automatiquement une requête HEAD en parallèle et lit les headers de réponse pour détecter si la réponse provient d'un cache CDN ou du serveur d'origine.
+
+| CDN détecté | Header analysé |
+|---|---|
+| Cloudflare | `CF-Ray` |
+| CloudFront (AWS) | `X-Amz-Cf-Pop` |
+| Fastly | `X-Served-By` |
+| Akamai | `X-Check-Cacheable` |
+| Varnish | `Via` |
+
+Le statut cache (`HIT` ou `MISS`), le point de présence réseau (PoP, ex: `YYZ` = Toronto) et l'âge de l'entrée cache sont affichés dans la section **Cache / CDN**.
+
+Cette information explique souvent une latence anormalement basse (cache HIT proche) ou haute (requête remontée à l'origine).
+
+## Profils multi-environnements (`--config-file`)
+
+Créez un fichier de configuration par environnement et sélectionnez-le à l'exécution :
+
+```bash
+ping-tool --config-file prod.yaml
+ping-tool --config-file staging.yaml
+```
 
 ## Support multilingue
 
