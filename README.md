@@ -7,8 +7,48 @@ Displays a complete latency distribution (P50 to P99.9) from the terminal.
 
 ## Installation
 
+### macOS
+
+```bash
+# Option 1 — Homebrew (recommended, no Python required)
+brew tap bglatence/ltiprobe
+brew install ltiprobe
+
+# Option 2 — pip
+pip install ltiprobe
+```
+
+### Linux
+
+On Linux, use **pipx** — it installs CLI tools in an isolated environment and configures PATH automatically:
+
+```bash
+# Install pipx (once)
+sudo apt install pipx        # Debian / Ubuntu
+pipx ensurepath              # adds ~/.local/bin to PATH
+source ~/.bashrc
+
+# Install ltiprobe
+pipx install ltiprobe
+ltiprobe --version
+```
+
+> **Why not plain `pip install`?**
+> Without a virtual environment, `pip` installs scripts in `~/.local/bin` which is often not in PATH on Linux.
+> Using `pipx` avoids this entirely.
+
+If you prefer `pip`, add `~/.local/bin` to your PATH first:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+pip install ltiprobe
+```
+
+### Windows
+
 ```bash
 pip install ltiprobe
+ltiprobe --version
 ```
 
 ## Usage
@@ -211,6 +251,20 @@ Affiche une distribution complète des latences (P50 à P99.9) depuis le Termina
 
 ### Installation
 
+**macOS**
+```bash
+brew tap bglatence/ltiprobe && brew install ltiprobe
+# ou
+pip install ltiprobe
+```
+
+**Linux** — utiliser `pipx` pour éviter les problèmes de PATH :
+```bash
+sudo apt install pipx && pipx ensurepath && source ~/.bashrc
+pipx install ltiprobe
+```
+
+**Windows**
 ```bash
 pip install ltiprobe
 ```
