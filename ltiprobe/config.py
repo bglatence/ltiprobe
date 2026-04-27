@@ -2,7 +2,7 @@
 import os
 import yaml
 
-FICHIER_DEFAUT = "ping-tool.yaml"
+FICHIER_DEFAUT = "ltiprobe.yaml"
 
 _DEFAULTS = {
     "nb_mesures": 10,

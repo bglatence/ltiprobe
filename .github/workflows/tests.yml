@@ -1,4 +1,4 @@
-name: Tests ping-tool
+name: Tests ltiprobe
 
 on:
   push:
@@ -47,10 +47,10 @@ jobs:
         run: ruff check .
 
       - name: Mypy — verification types
-        run: mypy ping_tool/ --ignore-missing-imports
+        run: mypy ltiprobe/ --ignore-missing-imports
 
       - name: Lancer pytest
         run: pytest -v
 
-      - name: Verifier ping-tool
-        run: ping-tool --version
+      - name: Verifier ltiprobe
+        run: ltiprobe --version

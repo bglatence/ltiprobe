@@ -140,7 +140,7 @@ def detecter_cdn(url, timeout=10):
     """
     try:
         req = urllib.request.Request(url, method="HEAD")
-        req.add_header("User-Agent", "Mozilla/5.0 (compatible; ping-tool)")
+        req.add_header("User-Agent", "Mozilla/5.0 (compatible; ltiprobe)")
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             headers = resp.headers
     except Exception:

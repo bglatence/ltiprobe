@@ -3,8 +3,8 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ping-tool-bglatence"
-version = "0.2.1"
+name = "ltiprobe"
+version = "0.3.0"
 description = "Mesure les temps de reponse HTTP et DNS de sites web"
 readme = "README.md"
 license = { text = "MIT" }
@@ -22,10 +22,10 @@ Homepage = "https://github.com/bglatence/ping-tool"
 Issues = "https://github.com/bglatence/ping-tool/issues"
 
 [project.scripts]
-ping-tool = "ping_tool.main:main"
+ltiprobe = "ltiprobe.main:main"
 
 [tool.setuptools.packages.find]
-include = ["ping_tool*"]
+include = ["ltiprobe*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -33,6 +33,9 @@ pythonpath = ["."]
 filterwarnings = [
     "ignore::DeprecationWarning:ctypes",
 ]
+
+[tool.mypy]
+ignore_missing_imports = true
 
 [tool.ruff]
 exclude = [

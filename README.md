@@ -1,36 +1,36 @@
-# ping-tool
+# ltiprobe
 
 Mesure les temps de réponse HTTP, DNS, ICMP, TCP et TLS de sites web depuis le Terminal.
 Affiche une distribution complète des latences (P50 à P99.9) avec vérification des SLOs.
 
-[![PyPI version](https://badge.fury.io/py/ping-tool-bglatence.svg)](https://pypi.org/project/ping-tool-bglatence/)
+[![PyPI version](https://badge.fury.io/py/ltiprobe.svg)](https://pypi.org/project/ltiprobe/)
 
 ## Installation
 
 ```bash
-pip install ping-tool-bglatence
+pip install ltiprobe
 ```
 
 ## Utilisation
 
 ```bash
-# Sites définis dans ping-tool.yaml (par défaut)
-ping-tool
+# Sites définis dans ltiprobe.yaml (par défaut)
+ltiprobe
 
 # Sites personnalisés en argument
-ping-tool https://apple.com https://amazon.com
+ltiprobe https://apple.com https://amazon.com
 
 # Nombre de mesures par site
-ping-tool -n 20
+ltiprobe -n 20
 
 # Sauvegarder les résultats en CSV
-ping-tool --csv
+ltiprobe --csv
 
 # Afficher le nombre de hops réseau (traceroute)
-ping-tool --traceroute
+ltiprobe --traceroute
 
 # Aide
-ping-tool --help
+ltiprobe --help
 ```
 
 ## Exemple de sortie
@@ -63,7 +63,7 @@ https://google.com
 
 ## Configuration
 
-Créez un fichier `ping-tool.yaml` à la racine de votre projet :
+Créez un fichier `ltiprobe.yaml` à la racine de votre projet :
 
 ```yaml
 nb_mesures: 10
@@ -86,7 +86,7 @@ sites:
     # aucun SLO — mesure sans vérification
 ```
 
-Si le fichier est absent, ping-tool démarre avec des sites et valeurs par défaut.
+Si le fichier est absent, ltiprobe démarre avec des sites et valeurs par défaut.
 
 ### Clés SLO disponibles
 
@@ -102,7 +102,7 @@ Si le fichier est absent, ping-tool démarre avec des sites et valeurs par défa
 
 ## Comparaison des couches protocolaires
 
-Pour chaque site, ping-tool mesure les quatre couches en parallèle et affiche les deltas :
+Pour chaque site, ltiprobe mesure les quatre couches en parallèle et affiche les deltas :
 
 | Couche | Ce qui est mesuré |
 |---|---|
@@ -116,7 +116,7 @@ Pour chaque site, ping-tool mesure les quatre couches en parallèle et affiche l
 
 ## Indicateur de stabilité
 
-ping-tool calcule le ratio P99/P50 pour évaluer la régularité de la latence :
+ltiprobe calcule le ratio P99/P50 pour évaluer la régularité de la latence :
 
 | Ratio | Interprétation |
 |---|---|
@@ -140,12 +140,12 @@ Les hops masqués (`* * *`) sont comptabilisés mais signalés séparément.
 
 ## Support multilingue
 
-Définissez `langue: EN` dans `ping-tool.yaml` pour afficher les résultats en anglais.
+Définissez `langue: EN` dans `ltiprobe.yaml` pour afficher les résultats en anglais.
 Valeurs acceptées : `FR` (défaut) et `EN`.
 
 ## Export CSV
 
-Avec `--csv`, ping-tool génère un fichier horodaté contenant les colonnes
+Avec `--csv`, ltiprobe génère un fichier horodaté contenant les colonnes
 `moyenne`, `min`, `max`, `p50`, `p75`, `p90`, `p95`, `p99`, `p999`, `dns_moyenne` et `hdr_encode`
 (histogramme compressé rejouable avec la bibliothèque [HdrHistogram](https://github.com/HdrHistogram/HdrHistogram_py)).
 
