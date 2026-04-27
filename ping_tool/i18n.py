@@ -38,7 +38,12 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "hops_bon":             "bon        (≤ 25)",
         "hops_eleve":           "élevé      (≤ 35)",
         "hops_critique":        "critique   (> 35)",
-        "csv_sauvegarde":       "Résultats sauvegardés dans : {f}",
+        "slo_titre":        "\n  ── Analyse SLO ─────────────────────────────────────",
+        "slo_check_ok":     "✓ OK",
+        "slo_check_nok":    "✗ VIOLATION",
+        "slo_bilan_ok":     "  Bilan : {ok}/{total} objectifs respectés",
+        "slo_bilan_nok":    "  Bilan : {ok}/{total} objectifs respectés",
+        "csv_sauvegarde":   "Résultats sauvegardés dans : {f}",
     },
     "EN": {
         "header":           "Measuring response times ({n} attempts)...",
@@ -78,7 +83,12 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "hops_bon":               "good       (≤ 25)",
         "hops_eleve":             "high       (≤ 35)",
         "hops_critique":          "critical   (> 35)",
-        "csv_sauvegarde":         "Results saved to: {f}",
+        "slo_titre":        "\n  ── SLO Analysis ─────────────────────────────────────",
+        "slo_check_ok":     "✓ OK",
+        "slo_check_nok":    "✗ VIOLATION",
+        "slo_bilan_ok":     "  Summary: {ok}/{total} objectives met",
+        "slo_bilan_nok":    "  Summary: {ok}/{total} objectives met",
+        "csv_sauvegarde":   "Results saved to: {f}",
     },
 }
 

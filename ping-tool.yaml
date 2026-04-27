@@ -8,24 +8,32 @@ nb_mesures: 10
 timeout: 10
 
 # Langue d'affichage : FR (français) ou EN (anglais)
-langue: FR
+langue: EN
 
 # Liste des sites à mesurer
 # Chaque site peut définir un SLO (Service Level Objective) optionnel.
 # Clés SLO disponibles :
-#   http_p50_ms   — latence HTTP médiane (P50)
-#   http_p75_ms   — latence HTTP P75
-#   http_p90_ms   — latence HTTP P90
-#   http_p95_ms   — latence HTTP P95
-#   http_p99_ms   — latence HTTP P99
-#   http_p999_ms  — latence HTTP P99.9
-#   dns_ms        — latence DNS moyenne
+#   http_p50_ms     — latence HTTP médiane (P50)
+#   http_p75_ms     — latence HTTP P75
+#   http_p90_ms     — latence HTTP P90
+#   http_p95_ms     — latence HTTP P95
+#   http_p99_ms     — latence HTTP P99
+#   http_p999_ms    — latence HTTP P99.9
+#   dns_ms          — latence DNS moyenne
+#   stabilite_ratio — ratio p99/p50 (ex: 1.5 signifie p99 <= 1.5x p50)
+#   icmp_ms         — latence ICMP (réseau) moyenne
+#   tcp_ms          — latence handshake TCP moyenne
+#   tls_ms          — latence handshake TLS moyenne
+#   http_chaud_ms   — latence HTTP estimée keep-alive (sans TCP/TLS)
+#   nb_hops_max     — nombre de hops maximum (requiert --traceroute)
 sites:
   - url: https://google.com
     slo:
-      http_p50_ms: 100
+      http_p50_ms: 300
       http_p95_ms: 400
       dns_ms: 50
+      stabilite_ratio: 5
+      tls_ms: 80
 
   - url: https://www.latencetech.com
     slo:
