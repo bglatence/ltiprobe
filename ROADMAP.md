@@ -122,7 +122,7 @@ Compléter la mesure TLS avec des informations qualitatives :
 
 ---
 
-### 8. Détection CDN et cache
+### 8. Détection CDN et cache ✓ *implémenté*
 **Inspiré de** `curl -I`, outils d'audit web
 
 Lire les headers de réponse pour déterminer si la réponse vient d'un cache
@@ -230,3 +230,4 @@ alerting:
 | Validation HTTP (status, body, header) | ✓ | — | — | ✓ | — |
 | Profils multi-fichiers (`--config-file`) | ✓ | — | — | — | — |
 | Indicateur de hops réseau (traceroute) | ✓ | — | ✓ | — | — |
+| Détection CDN et statut cache | ✓ | — | — | — | partiel |

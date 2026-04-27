@@ -261,6 +261,28 @@ def test_mesurer_icmp_invalide():
     r = mesurer_icmp("hote.inexistant.invalid", nb_mesures=1)
     assert r is None
 
+def test_detecter_cdn_retourne_dict():
+    """detecter_cdn sur un site accessible doit retourner un dict avec les clés attendues."""
+    from ping_tool.core import detecter_cdn
+    r = detecter_cdn("https://google.com")
+    assert r is not None
+    for cle in ("cdn", "cache", "age_s", "pop", "via"):
+        assert cle in r, f"Clé manquante : {cle}"
+
+def test_detecter_cdn_invalide():
+    """Un hôte inexistant doit retourner None."""
+    from ping_tool.core import detecter_cdn
+    r = detecter_cdn("https://hote.inexistant.invalid")
+    assert r is None
+
+def test_detecter_cdn_cloudflare():
+    """Un site derrière Cloudflare doit être détecté."""
+    from ping_tool.core import detecter_cdn
+    r = detecter_cdn("https://www.cloudflare.com")
+    assert r is not None
+    assert r["cdn"] == "Cloudflare"
+
+
 def test_mesurer_site_valide():
     """Un site valide doit retourner HTTP, DNS et la distribution complète."""
     r = mesurer_site("https://google.com", nb_mesures=1)

@@ -118,6 +118,76 @@ def verifier_assertions(url, asserts, timeout=10):
 
     return checks
 
+_CDN_SIGNATURES = [
+    # (nom_cdn, header_detecteur, lambda headers -> True si match)
+    ("Cloudflare",  "CF-Ray",          lambda h: bool(h.get("CF-Ray"))),
+    ("CloudFront",  "X-Amz-Cf-Pop",   lambda h: bool(h.get("X-Amz-Cf-Pop"))),
+    ("Fastly",      "X-Served-By",     lambda h: "cache" in (h.get("X-Served-By") or "").lower()),
+    ("Akamai",      "X-Check-Cacheable", lambda h: bool(h.get("X-Check-Cacheable"))),
+    ("Varnish",     "Via",             lambda h: "varnish" in (h.get("Via") or "").lower()),
+]
+
+def detecter_cdn(url, timeout=10):
+    """Effectue une requête HEAD et lit les headers pour détecter CDN/cache.
+
+    Retourne un dict :
+      cdn       : str | None   — nom du CDN détecté (ex: "Cloudflare")
+      cache     : str | None   — statut cache : "HIT", "MISS" ou None
+      age_s     : int | None   — âge du cache en secondes (header Age)
+      pop       : str | None   — point de présence CDN (ex: "YUL" de CF-Ray)
+      via       : str | None   — valeur brute du header Via
+    Retourne None si la requête échoue.
+    """
+    try:
+        req = urllib.request.Request(url, method="HEAD")
+        req.add_header("User-Agent", "Mozilla/5.0 (compatible; ping-tool)")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            headers = resp.headers
+    except Exception:
+        return None
+
+    cdn_nom = None
+    for nom, _, fn in _CDN_SIGNATURES:
+        if fn(headers):
+            cdn_nom = nom
+            break
+
+    # Cache status
+    cache = None
+    for hdr in ("X-Cache", "CF-Cache-Status", "X-Cache-Status"):
+        val = headers.get(hdr, "")
+        if val:
+            upper = val.upper()
+            if "HIT" in upper:
+                cache = "HIT"
+            elif "MISS" in upper:
+                cache = "MISS"
+            break
+
+    # PoP depuis CF-Ray : "abc123-YUL" → "YUL"
+    pop = None
+    cf_ray = headers.get("CF-Ray", "")
+    if cf_ray and "-" in cf_ray:
+        pop = cf_ray.split("-")[-1]
+    if not pop:
+        pop = headers.get("X-Amz-Cf-Pop") or headers.get("X-Served-By") or None
+        if pop and len(pop) > 15:
+            pop = None
+
+    age_s = None
+    age_raw = headers.get("Age", "")
+    if age_raw.isdigit():
+        age_s = int(age_raw)
+
+    return {
+        "cdn":   cdn_nom,
+        "cache": cache,
+        "age_s": age_s,
+        "pop":   pop,
+        "via":   headers.get("Via"),
+    }
+
+
 def verifier_slo(resultat, slo):
     """Compare un résultat mesuré contre un dict SLO.
 
