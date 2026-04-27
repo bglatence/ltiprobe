@@ -57,8 +57,10 @@ ltiprobe --version
 # Sites defined in ltiprobe.yaml (default)
 ltiprobe
 
-# Custom sites as arguments
+# DNS name or IP address as argument
 ltiprobe https://apple.com https://amazon.com
+ltiprobe http://192.168.1.100
+ltiprobe https://10.0.0.5
 
 # Number of measurements per site
 ltiprobe -n 20
@@ -72,9 +74,16 @@ ltiprobe --traceroute
 # Use an alternate config file
 ltiprobe --config-file staging.yaml
 
+# Disable TLS certificate validation (self-signed cert or direct IP)
+ltiprobe --no-verify-tls https://10.0.0.5
+
 # Help
 ltiprobe --help
 ```
+
+> **DNS name or IP address**: ltiprobe accepts both. When using an IP address directly,
+> DNS measurement is skipped (shown as N/A) and reachability is verified before starting.
+> Use `--no-verify-tls` when the server uses a self-signed certificate.
 
 ## Sample output
 
@@ -273,12 +282,17 @@ pip install ltiprobe
 
 ```bash
 ltiprobe                              # Sites définis dans ltiprobe.yaml
-ltiprobe https://apple.com            # Site personnalisé
+ltiprobe https://apple.com            # Nom DNS
+ltiprobe http://192.168.1.100         # Adresse IP directe
+ltiprobe --no-verify-tls https://10.0.0.5  # IP avec cert auto-signé
 ltiprobe -n 20                        # 20 mesures par site
 ltiprobe --csv                        # Export CSV
 ltiprobe --traceroute                 # Afficher les hops réseau
 ltiprobe --config-file staging.yaml   # Fichier de config alternatif
 ```
+
+> **Nom DNS ou adresse IP** : les deux sont acceptés. En mode IP, la mesure DNS est
+> ignorée (affiché N/A) et la joignabilité est vérifiée avant le démarrage.
 
 ### Configuration (`ltiprobe.yaml`)
 
