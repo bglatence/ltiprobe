@@ -8,17 +8,17 @@ from ltiprobe.i18n import get_translator
 def test_i18n_fr_header():
     """Le traducteur FR doit produire un message en français."""
     t = get_translator("FR")
-    assert "essais" in t("header", n=5, cfg="ltiprobe.yaml")
+    assert "essais" in t("header", ver="0.3.0", n=5, cfg="ltiprobe.yaml")
 
 def test_i18n_en_header():
     """Le traducteur EN doit produire un message en anglais."""
     t = get_translator("EN")
-    assert "attempts" in t("header", n=5, cfg="ltiprobe.yaml")
+    assert "attempts" in t("header", ver="0.3.0", n=5, cfg="ltiprobe.yaml")
 
 def test_i18n_langue_inconnue_repli_fr():
     """Une langue inconnue doit utiliser le français par défaut."""
     t = get_translator("ZZ")
-    assert "essais" in t("header", n=5, cfg="ltiprobe.yaml")
+    assert "essais" in t("header", ver="0.3.0", n=5, cfg="ltiprobe.yaml")
 
 def test_i18n_cles_identiques():
     """FR et EN doivent avoir exactement les mêmes clés."""

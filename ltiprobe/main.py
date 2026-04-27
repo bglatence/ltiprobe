@@ -251,7 +251,7 @@ def main():
         ]
 
     cfg_file = args.config_file or config.FICHIER_DEFAUT
-    print(t("header", n=args.nombre, cfg=cfg_file) + "\n")
+    print(t("header", ver="0.3.0", n=args.nombre, cfg=cfg_file) + "\n")
 
     resultats = []
 
