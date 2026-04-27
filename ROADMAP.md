@@ -174,14 +174,33 @@ Utile pour valider la configuration réseau et le routage.
 
 ---
 
-### 12. Profils multi-environnements
+### 12. Profils multi-environnements ✓ *implémenté — option `--config-file`*
 Sélectionner un fichier de configuration différent selon l'environnement,
 pour comparer facilement staging vs production.
 
 ```bash
-ping-tool --config prod.yaml
-ping-tool --config staging.yaml
+ping-tool --config-file prod.yaml
+ping-tool --config-file staging.yaml
 ```
+
+---
+
+### 14. Détection des redirections HTTP dans les assertions
+
+**Contexte :** L'assertion `status_code` actuelle suit automatiquement les redirections
+(`urllib` suit les 301/302 par défaut) et retourne le code final. Il n'est donc pas possible
+de vérifier qu'une URL `http://` redirige bien vers `https://`.
+
+Ajouter un mode sans suivi de redirections pour les assertions :
+
+```yaml
+assert:
+  status_code: 301          # vérifie la redirection elle-même
+  location: "https://"     # vérifie le header Location
+  follow_redirects: false   # désactive le suivi automatique
+```
+
+Utile pour valider que la politique HTTPS est bien en place (HSTS, redirection forcée).
 
 ---
 
@@ -208,3 +227,6 @@ alerting:
 | Estimation keep-alive vs connexion froide | ✓ | — | — | — | — |
 | Multi-langue (FR/EN) | ✓ | — | — | — | — |
 | Configuration YAML avec SLOs par site | ✓ | — | — | ✓ | — |
+| Validation HTTP (status, body, header) | ✓ | — | — | ✓ | — |
+| Profils multi-fichiers (`--config-file`) | ✓ | — | — | — | — |
+| Indicateur de hops réseau (traceroute) | ✓ | — | ✓ | — | — |
