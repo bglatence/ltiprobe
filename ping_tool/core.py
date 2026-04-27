@@ -59,6 +59,65 @@ SLO_UNITES: dict[str, str] = {
     "nb_hops_max":     "hops",
 }
 
+def verifier_assertions(url, asserts, timeout=10):
+    """Effectue une requête et vérifie les assertions déclarées dans le YAML.
+
+    Clés supportées dans asserts :
+      - status_code    : int — code HTTP attendu (ex: 200)
+      - body_contains  : str — chaîne attendue dans les premiers 4 Ko du body
+      - header         : str — "Clé: Valeur" ou juste "Clé" (présence)
+
+    Retourne {clé: {attendu, recu, ok}} ou {"_erreur": message} si la requête échoue.
+    """
+    try:
+        with urllib.request.urlopen(
+            urllib.request.Request(url), timeout=timeout
+        ) as resp:
+            status  = resp.status
+            headers = resp.headers
+            body    = resp.read(4096).decode("utf-8", errors="replace")
+    except Exception as e:
+        return {"_erreur": str(e)}
+
+    checks: dict[str, dict] = {}
+
+    if "status_code" in asserts:
+        attendu = int(asserts["status_code"])
+        checks["status_code"] = {
+            "attendu": str(attendu),
+            "recu":    str(status),
+            "ok":      status == attendu,
+        }
+
+    if "body_contains" in asserts:
+        terme  = str(asserts["body_contains"])
+        trouve = terme in body
+        checks["body_contains"] = {
+            "attendu": f'"{terme}"',
+            "recu":    "trouvé" if trouve else "absent",
+            "ok":      trouve,
+        }
+
+    if "header" in asserts:
+        h = str(asserts["header"])
+        if ":" in h:
+            cle, val = h.split(":", 1)
+            cle = cle.strip()
+            val = val.strip()
+            recu = headers.get(cle, "")
+            ok   = val.lower() in recu.lower()
+        else:
+            cle  = h.strip()
+            recu = headers.get(cle, "")
+            ok   = bool(recu)
+        checks["header:" + cle] = {
+            "attendu": h,
+            "recu":    recu if recu else "absent",
+            "ok":      ok,
+        }
+
+    return checks
+
 def verifier_slo(resultat, slo):
     """Compare un résultat mesuré contre un dict SLO.
 

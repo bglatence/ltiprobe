@@ -8,7 +8,8 @@ from ping_tool.i18n import get_translator
 from ping_tool.core import (
     mesurer_site, sauvegarder_csv,
     creer_histogramme, hdr_enregistrer, hdr_stats,
-    verifier_slo, mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute,
+    verifier_slo, verifier_assertions,
+    mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute,
     SLO_UNITES,
 )
 
@@ -136,6 +137,19 @@ def afficher_traceroute(tr):
     print(t("traceroute_hops", n=tr["nb_hops"])
           + "  " + indicateur_hops(tr["nb_hops"]) + masques)
 
+def afficher_assertions(assert_checks):
+    """Affiche la section Validation HTTP."""
+    if not assert_checks:
+        return
+    print(t("assert_titre"))
+    if "_erreur" in assert_checks:
+        print(t("assert_erreur", msg=assert_checks["_erreur"]))
+        return
+    largeur = max(len(c) for c in assert_checks) + 2
+    for cle, c in assert_checks.items():
+        statut = (VERT + t("slo_check_ok") + RESET) if c["ok"] else (ROUGE + t("slo_check_nok") + RESET)
+        print("  " + cle.ljust(largeur) + c["attendu"].ljust(30) + "→  " + c["recu"].ljust(20) + statut)
+
 def afficher_analyse_slo(slo_checks):
     """Affiche la section SLO Analysis groupée en fin de résultat."""
     if not slo_checks:
@@ -178,6 +192,7 @@ def afficher_resultat(r, slo_checks=None):
     if "icmp" in r or "tcp" in r or "tls" in r:
         afficher_protocoles(r.get("icmp"), r.get("tcp"), r.get("tls"), r.get("p50"), r["url"])
 
+    afficher_assertions(r.get("assert_checks"))
     afficher_analyse_slo(slo_checks)
     print("")
 
@@ -207,8 +222,9 @@ def main():
     resultats = []
 
     for site_cfg in sites_config:
-        site = site_cfg["url"]
-        slo  = site_cfg.get("slo")
+        site    = site_cfg["url"]
+        slo     = site_cfg.get("slo")
+        asserts = site_cfg.get("assert")
 
         hist_http   = creer_histogramme()
         mesures_dns = []
@@ -314,8 +330,10 @@ def main():
                 "http_chaud_ms":   http_chaud,
                 "nb_hops":         traceroute["nb_hops"] if traceroute else None,
             }
-            slo_checks = verifier_slo(resultat_final, slo) if slo else None
-            resultat_final["slo_checks"] = slo_checks
+            slo_checks    = verifier_slo(resultat_final, slo) if slo else None
+            assert_checks = verifier_assertions(site, asserts, timeout=args.timeout) if asserts else None
+            resultat_final["slo_checks"]    = slo_checks
+            resultat_final["assert_checks"] = assert_checks
 
             resultats.append(resultat_final)
             afficher_resultat(resultat_final, slo_checks)
