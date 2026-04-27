@@ -8,7 +8,7 @@ from ping_tool.i18n import get_translator
 from ping_tool.core import (
     mesurer_site, sauvegarder_csv,
     creer_histogramme, hdr_enregistrer, hdr_stats,
-    verifier_slo, mesurer_icmp, mesurer_tcp, mesurer_tls,
+    verifier_slo, mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute,
 )
 
 # Codes ANSI — désactivés si la sortie n'est pas un terminal (fichier, CI)
@@ -54,7 +54,32 @@ def parse_arguments():
         default=config.TIMEOUT,
         help="Timeout en secondes (defaut: %(default)s)"
     )
+    parser.add_argument(
+        "--traceroute",
+        action="store_true",
+        help="Afficher le nombre de hops reseau vers chaque site"
+    )
     return parser.parse_args()
+
+def indicateur_hops(nb_hops):
+    if nb_hops <= 15:
+        return VERT   + t("hops_excellent") + RESET
+    if nb_hops <= 25:
+        return VERT   + t("hops_bon")       + RESET
+    if nb_hops <= 35:
+        return ORANGE + t("hops_eleve")     + RESET
+    return ROUGE  + t("hops_critique")  + RESET
+
+def afficher_traceroute(tr):
+    if tr is None:
+        print(t("traceroute_na"))
+        return
+    if not tr["destination_atteinte"]:
+        print(t("traceroute_non_atteint", n=tr["nb_hops"]))
+        return
+    masques = ("  (" + str(tr["nb_masques"]) + " " + t("hops_masques") + ")") if tr["nb_masques"] else ""
+    print(t("traceroute_hops", n=tr["nb_hops"])
+          + "  " + indicateur_hops(tr["nb_hops"]) + masques)
 
 def indicateur_stabilite(p50, p99):
     if p50 <= 0:
@@ -141,6 +166,8 @@ def afficher_resultat(r, slo_checks=None):
             print(VERT + t("slo_ok") + RESET)
         else:
             print(ROUGE + t("slo_violation", n=nb_violations) + RESET)
+    if r.get("traceroute") is not None:
+        afficher_traceroute(r["traceroute"])
     if "icmp" in r or "tcp" in r or "tls" in r:
         afficher_protocoles(r.get("icmp"), r.get("tcp"), r.get("tls"), r.get("p50"), r["url"])
     print("")
@@ -170,6 +197,7 @@ def main():
         icmp_result = {}
         tcp_result  = {}
         tls_result  = {}
+        tr_result   = {}
 
         hostname = site.split("//")[-1].split("/")[0]
         is_https = site.startswith("https://")
@@ -189,10 +217,17 @@ def main():
                 {"tls": mesurer_tls(site, nb_mesures=args.nombre, timeout=args.timeout)}
             )
         )
+        tr_thread = threading.Thread(
+            target=lambda: tr_result.update(
+                {"tr": mesurer_traceroute(hostname)}
+            )
+        )
         icmp_thread.start()
         tcp_thread.start()
         if is_https:
             tls_thread.start()
+        if args.traceroute:
+            tr_thread.start()
 
         with tqdm(
             total=args.nombre,
@@ -215,6 +250,8 @@ def main():
         tcp_thread.join()
         if is_https:
             tls_thread.join()
+        if args.traceroute:
+            tr_thread.join()
 
         if erreur:
             resultats.append(erreur)
@@ -235,6 +272,7 @@ def main():
                 "icmp":        icmp_result.get("icmp"),
                 "tcp":         tcp_result.get("tcp"),
                 "tls":         tls_result.get("tls") if is_https else None,
+                "traceroute":  tr_result.get("tr") if args.traceroute else None,
             }
             slo_checks = verifier_slo(resultat_final, slo) if slo else None
             resultat_final["slo_checks"] = slo_checks

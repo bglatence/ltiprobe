@@ -171,6 +171,23 @@ def test_mesurer_tls_valide():
     assert r["min"] <= r["moyenne"] <= r["max"]
     assert r["nb"] == 2
 
+@pytest.mark.skipif(os.getenv("CI") == "true", reason="traceroute bloqué en CI")
+def test_mesurer_traceroute_valide():
+    """Un hôte accessible doit retourner un nombre de hops positif."""
+    from ping_tool.core import mesurer_traceroute
+    r = mesurer_traceroute("google.com", max_hops=30)
+    assert r is not None
+    assert r["nb_hops"] > 0
+    assert r["nb_repondus"] >= 0
+    assert r["nb_masques"] >= 0
+    assert r["nb_repondus"] + r["nb_masques"] == r["nb_hops"]
+
+def test_mesurer_traceroute_invalide():
+    """Un hôte inexistant doit retourner None."""
+    from ping_tool.core import mesurer_traceroute
+    r = mesurer_traceroute("hote.inexistant.invalid", max_hops=3)
+    assert r is None
+
 def test_mesurer_tls_invalide():
     """Un hôte inexistant doit retourner None."""
     from ping_tool.core import mesurer_tls

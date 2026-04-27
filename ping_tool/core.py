@@ -98,6 +98,43 @@ def mesurer_tcp(hostname, nb_mesures=5, timeout=10):
         "port":    port,
     }
 
+def mesurer_traceroute(hostname, max_hops=30):
+    """Compte les hops jusqu'à destination via traceroute système.
+
+    Utilise -q 1 -w 1 pour minimiser le temps d'attente.
+    Retourne {nb_hops, nb_repondus, nb_masques, destination_atteinte} ou None.
+    """
+    import platform
+    hostname = hostname.replace("https://", "").replace("http://", "").split("/")[0]
+    if platform.system() == "Windows":
+        cmd = ["tracert", "-d", "-h", str(max_hops), hostname]
+    else:
+        cmd = ["traceroute", "-n", "-q", "1", "-w", "1", "-m", str(max_hops), hostname]
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=max_hops * 4
+        )
+        hops = []
+        for line in result.stdout.splitlines():
+            m = re.match(r"^\s*(\d+)\s+", line)
+            if not m:
+                continue
+            hop_num = int(m.group(1))
+            repond = bool(re.search(r"\d+\.?\d*\s*ms", line))
+            hops.append({"hop": hop_num, "repond": repond})
+        if not hops:
+            return None
+        nb_total = hops[-1]["hop"]
+        nb_repondus = sum(1 for h in hops if h["repond"])
+        return {
+            "nb_hops":            nb_total,
+            "nb_repondus":        nb_repondus,
+            "nb_masques":         nb_total - nb_repondus,
+            "destination_atteinte": nb_total < max_hops,
+        }
+    except Exception:
+        return None
+
 def mesurer_tls(hostname, nb_mesures=5, timeout=10):
     """Mesure la latence du handshake TLS seul (après TCP connect).
 
