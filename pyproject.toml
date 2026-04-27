@@ -5,27 +5,29 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ltiprobe"
 version = "0.3.0"
-description = "Mesure les temps de reponse HTTP et DNS de sites web"
+description = "HTTP/DNS/ICMP/TCP/TLS latency measurement tool with SLO validation and CDN detection"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.8"
 dependencies = ["tqdm>=4.0", "hdrhistogram>=0.9.0", "pyyaml>=6.0"]
-keywords = ["ping", "http", "dns", "network", "latency"]
+keywords = ["ping", "http", "dns", "network", "latency", "slo", "monitoring", "cdn"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 
 [project.urls]
-Homepage = "https://github.com/bglatence/ping-tool"
-Issues = "https://github.com/bglatence/ping-tool/issues"
+Homepage = "https://github.com/bglatence/ltiprobe"
+Issues = "https://github.com/bglatence/ltiprobe/issues"
 
 [project.scripts]
 ltiprobe = "ltiprobe.main:main"
 
 [tool.setuptools.packages.find]
 include = ["ltiprobe*"]
+
+[tool.setuptools]
+exclude-package-data = {"*" = ["ROADMAP.md"]}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
