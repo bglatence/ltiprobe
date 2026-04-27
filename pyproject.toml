@@ -18,8 +18,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/bglatence/ping-tool"
-Issues = "https://github.com/bglatence/ping-tool/issues"
+Homepage = "https://github.com/bglatence/ltiprobe"
+Issues = "https://github.com/bglatence/ltiprobe/issues"
 
 [project.scripts]
 ltiprobe = "ltiprobe.main:main"
