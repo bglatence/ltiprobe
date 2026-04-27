@@ -38,13 +38,25 @@ def hdr_stats(hist):
 
 # Correspondance clé SLO → clé dans le dict résultat
 _SLO_VERS_RESULTAT = {
-    "http_p50_ms":  "p50",
-    "http_p75_ms":  "p75",
-    "http_p90_ms":  "p90",
-    "http_p95_ms":  "p95",
-    "http_p99_ms":  "p99",
-    "http_p999_ms": "p999",
-    "dns_ms":       "dns_moyenne",
+    "http_p50_ms":     "p50",
+    "http_p75_ms":     "p75",
+    "http_p90_ms":     "p90",
+    "http_p95_ms":     "p95",
+    "http_p99_ms":     "p99",
+    "http_p999_ms":    "p999",
+    "dns_ms":          "dns_moyenne",
+    "stabilite_ratio": "stabilite_ratio",
+    "icmp_ms":         "icmp_ms",
+    "tcp_ms":          "tcp_ms",
+    "tls_ms":          "tls_ms",
+    "http_chaud_ms":   "http_chaud_ms",
+    "nb_hops_max":     "nb_hops",
+}
+
+# Unité d'affichage par clé SLO (défaut : "ms")
+SLO_UNITES: dict[str, str] = {
+    "stabilite_ratio": "x",
+    "nb_hops_max":     "hops",
 }
 
 def verifier_slo(resultat, slo):

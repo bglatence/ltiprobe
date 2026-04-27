@@ -64,6 +64,24 @@ def test_verifier_slo_violation():
     assert checks["http_p95_ms"]["ok"]
     assert checks["dns_ms"]["ok"]
 
+def test_verifier_slo_stabilite_ratio():
+    """stabilite_ratio doit vérifier p99/p50 par rapport au seuil."""
+    resultat = {"p50": 100.0, "p99": 200.0, "stabilite_ratio": 2.0}
+    checks = verifier_slo(resultat, {"stabilite_ratio": 3.0})
+    assert checks["stabilite_ratio"]["ok"]
+    checks2 = verifier_slo(resultat, {"stabilite_ratio": 1.5})
+    assert not checks2["stabilite_ratio"]["ok"]
+
+def test_verifier_slo_nouvelles_cles():
+    """icmp_ms, tcp_ms, tls_ms et http_chaud_ms doivent être vérifiables."""
+    resultat = {
+        "icmp_ms": 12.0, "tcp_ms": 18.0,
+        "tls_ms": 45.0, "http_chaud_ms": 70.0,
+    }
+    slo = {"icmp_ms": 20, "tcp_ms": 30, "tls_ms": 50, "http_chaud_ms": 100}
+    checks = verifier_slo(resultat, slo)
+    assert all(c["ok"] for c in checks.values())
+
 def test_verifier_slo_cle_inconnue():
     """Une clé SLO inconnue doit être ignorée silencieusement."""
     resultat = {"p50": 100.0}
@@ -98,6 +116,8 @@ def test_config_yaml(tmp_path):
 _CLES_SLO_VALIDES = {
     "http_p50_ms", "http_p75_ms", "http_p90_ms",
     "http_p95_ms", "http_p99_ms", "http_p999_ms", "dns_ms",
+    "stabilite_ratio", "icmp_ms", "tcp_ms", "tls_ms",
+    "http_chaud_ms", "nb_hops_max",
 }
 
 def test_ping_tool_yaml_existe():
