@@ -339,6 +339,79 @@ def mesurer_tls(hostname, nb_mesures=5, timeout=10, verify=True):
         "nb":      len(rtts),
     }
 
+_SEUIL_EXPIRY_ALERTE = 30  # jours avant expiration → alerte
+
+def inspecter_tls(hostname, timeout=10, verify=True):
+    """Inspecte le certificat et la configuration TLS d'un serveur HTTPS.
+
+    Retourne un dict :
+      version     : str        — "TLSv1.3", "TLSv1.2", …
+      cipher      : str        — suite chiffrée négociée
+      issuer      : str        — nom de l'émetteur du certificat
+      subject     : str        — CN du certificat (domaine couvert)
+      expire_date : date       — date d'expiration
+      jours_restants : int     — jours avant expiration (négatif si expiré)
+      hsts        : str|None   — valeur brute du header Strict-Transport-Security
+    Retourne None si la connexion échoue.
+    """
+    from datetime import date as date_type
+    hostname = hostname.replace("https://", "").replace("http://", "").split("/")[0]
+    if verify:
+        ctx = ssl.create_default_context()
+    else:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+    try:
+        sock = socket.create_connection((hostname, 443), timeout=timeout)
+        tls_sock = ctx.wrap_socket(sock, server_hostname=hostname)
+        version = tls_sock.version() or ""
+        cipher_info = tls_sock.cipher() or ("", "", 0)
+        cert = tls_sock.getpeercert() or {}
+        tls_sock.close()
+    except Exception:
+        return None
+
+    # Émetteur
+    issuer_dict = dict(x[0] for x in cert.get("issuer", []))
+    issuer = issuer_dict.get("organizationName") or issuer_dict.get("commonName") or "?"
+
+    # Sujet (CN)
+    subject_dict = dict(x[0] for x in cert.get("subject", []))
+    subject = subject_dict.get("commonName") or "?"
+
+    # Date d'expiration — format : "Aug 14 12:00:00 2025 GMT"
+    expire_date = None
+    jours_restants = None
+    not_after = cert.get("notAfter", "")
+    if not_after:
+        try:
+            expire_dt = datetime.strptime(not_after, "%b %d %H:%M:%S %Y %Z")
+            expire_date = expire_dt.date()
+            jours_restants = (expire_date - date_type.today()).days
+        except ValueError:
+            pass
+
+    # HSTS — requête HEAD séparée
+    hsts = None
+    try:
+        req = urllib.request.Request(f"https://{hostname}", method="HEAD")
+        req.add_header("User-Agent", "Mozilla/5.0 (compatible; ltiprobe)")
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            hsts = resp.headers.get("Strict-Transport-Security")
+    except Exception:
+        pass
+
+    return {
+        "version":        version,
+        "cipher":         cipher_info[0],
+        "issuer":         issuer,
+        "subject":        subject,
+        "expire_date":    expire_date,
+        "jours_restants": jours_restants,
+        "hsts":           hsts,
+    }
+
 def mesurer_icmp(hostname, nb_mesures=5):
     """Mesure la latence ICMP via la commande ping système.
 

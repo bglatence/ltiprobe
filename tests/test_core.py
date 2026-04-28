@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pytest
-from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison
+from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls
 from ltiprobe.i18n import get_translator
 
 
@@ -368,6 +368,23 @@ def test_sauvegarder_csv(tmp_path):
     for col in ["url", "p50", "p95", "p99", "hdr_encode", "dns_moyenne", "ttfb_p50", "transfert_p50"]:
         assert col in contenu, f"Colonne manquante dans le CSV : {col}"
     assert "https://test.com" in contenu
+
+
+def test_inspecter_tls_valide():
+    """inspecter_tls() sur un site HTTPS valide doit retourner les clés attendues."""
+    r = inspecter_tls("google.com")
+    assert r is not None
+    for cle in ("version", "cipher", "issuer", "subject", "expire_date", "jours_restants"):
+        assert cle in r, f"Clé manquante : {cle}"
+    assert r["version"] in ("TLSv1.2", "TLSv1.3")
+    assert r["jours_restants"] is not None
+    assert r["jours_restants"] > 0, "Le certificat de google.com ne doit pas être expiré"
+
+
+def test_inspecter_tls_invalide():
+    """inspecter_tls() sur un hôte inexistant doit retourner None."""
+    r = inspecter_tls("hote.inexistant.invalid")
+    assert r is None
 
 
 def test_charger_baseline(tmp_path):
