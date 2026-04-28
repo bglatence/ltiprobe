@@ -392,7 +392,9 @@ def mesurer_site(url, nb_mesures=None, timeout=None, verify_tls=True):
     nb = nb_mesures or config.NB_MESURES
     to = timeout or config.TIMEOUT
     hist_http = creer_histogramme()
-    mesures_dns = []
+    mesures_dns  = []
+    ttfb_mesures = []
+    transfert_mesures = []
 
     hostname = extraire_hostname(url)
     ip_mode = est_adresse_ip(hostname)
@@ -410,18 +412,28 @@ def mesurer_site(url, nb_mesures=None, timeout=None, verify_tls=True):
                 }
             mesures_dns.append(dns_ms)
 
-        # Mesure HTTP — enregistrement direct dans l'histogramme
+        # Mesure HTTP — urlopen() retourne dès que les headers sont reçus ;
+        # resp.read() lit le body. On chronométre les deux phases séparément.
         debut = time.perf_counter()
         try:
             if not verify_tls:
                 ctx = ssl.create_default_context()
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
-                urllib.request.urlopen(url, timeout=to, context=ctx)
+                resp = urllib.request.urlopen(url, timeout=to, context=ctx)
             else:
-                urllib.request.urlopen(url, timeout=to)
-            ms = round((time.perf_counter() - debut) * 1000, 2)
+                resp = urllib.request.urlopen(url, timeout=to)
+
+            ttfb_ms = round((time.perf_counter() - debut) * 1000, 2)
+            t1 = time.perf_counter()
+            resp.read()
+            resp.close()
+            transfert_ms = round((time.perf_counter() - t1) * 1000, 2)
+
+            ms = round(ttfb_ms + transfert_ms, 2)
             hdr_enregistrer(hist_http, ms)
+            ttfb_mesures.append(ttfb_ms)
+            transfert_mesures.append(transfert_ms)
 
         except urllib.error.URLError as e:
             raison = str(e.reason) if hasattr(e, 'reason') else str(e)
@@ -460,6 +472,9 @@ def mesurer_site(url, nb_mesures=None, timeout=None, verify_tls=True):
         "dns_moyenne": round(sum(mesures_dns) / len(mesures_dns), 2) if mesures_dns else None,
         "dns_min":     min(mesures_dns) if mesures_dns else None,
         "dns_max":     max(mesures_dns) if mesures_dns else None,
+        # TTFB / Transfert — moyenne si nb > 1, valeur unique si nb == 1
+        "ttfb_ms":      round(sum(ttfb_mesures) / len(ttfb_mesures), 2) if ttfb_mesures else None,
+        "transfert_ms": round(sum(transfert_mesures) / len(transfert_mesures), 2) if transfert_mesures else None,
     }
 
 def sauvegarder_csv(resultats, fichier=None):

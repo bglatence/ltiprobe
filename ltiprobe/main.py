@@ -216,6 +216,14 @@ def afficher_analyse_slo(slo_checks):
     else:
         print(ROUGE + t("slo_bilan_nok", ok=nb_ok, total=nb_total) + RESET)
 
+def afficher_http_timing(ttfb_p50, transfert_p50, total_p50):
+    if ttfb_p50 is None or transfert_p50 is None:
+        return
+    print(t("http_timing"))
+    print(t("ttfb",      v=ttfb_p50))
+    print(t("transfert", v=transfert_p50))
+    print(t("total_p50", v=total_p50))
+
 def afficher_resultat(r, slo_checks=None):
     if r["erreur"]:
         print(r["url"] + " -> " + r["message"])
@@ -230,6 +238,7 @@ def afficher_resultat(r, slo_checks=None):
     print(t("p95",  v=r["p95"]))
     print(t("p99",  v=r["p99"]))
     print(t("p999", v=r["p999"]))
+    afficher_http_timing(r.get("ttfb_p50"), r.get("transfert_p50"), r.get("p50"))
     print(t("stabilite") + indicateur_stabilite(r["p50"], r["p99"]))
     if r.get("ip_mode"):
         print(t("dns_ip_na"))
@@ -248,6 +257,12 @@ def afficher_resultat(r, slo_checks=None):
     print("")
 
 # ── Mesure d'un site (une itération) ─────────────────────────────────────────
+
+def _mediane(valeurs):
+    if not valeurs:
+        return None
+    s = sorted(valeurs)
+    return round(s[len(s) // 2], 2)
 
 def _mesurer_site(site_cfg, args, verify_tls):
     """Mesure un site et retourne le dict résultat, ou None si aucune donnée."""
@@ -270,14 +285,16 @@ def _mesurer_site(site_cfg, args, verify_tls):
             print(t("ip_non_joignable", msg=msg))
             return {"url": site, "erreur": True, "type_erreur": "ip", "message": msg}
 
-    hist_http   = creer_histogramme()
-    mesures_dns = []
-    erreur      = None
-    icmp_result = {}
-    tcp_result  = {}
-    tls_result  = {}
-    tr_result   = {}
-    cdn_result  = {}
+    hist_http        = creer_histogramme()
+    mesures_dns      = []
+    ttfb_mesures     = []
+    transfert_mesures = []
+    erreur           = None
+    icmp_result      = {}
+    tcp_result       = {}
+    tls_result       = {}
+    tr_result        = {}
+    cdn_result       = {}
 
     icmp_thread = threading.Thread(
         target=lambda: icmp_result.update(
@@ -329,6 +346,10 @@ def _mesurer_site(site_cfg, args, verify_tls):
             hdr_enregistrer(hist_http, r["moyenne"])
             if r["dns_moyenne"] is not None:
                 mesures_dns.append(r["dns_moyenne"])
+            if r.get("ttfb_ms") is not None:
+                ttfb_mesures.append(r["ttfb_ms"])
+            if r.get("transfert_ms") is not None:
+                transfert_mesures.append(r["transfert_ms"])
             barre.update(1)
 
     icmp_thread.join()
@@ -370,6 +391,8 @@ def _mesurer_site(site_cfg, args, verify_tls):
         "dns_moyenne":     round(sum(mesures_dns) / len(mesures_dns), 2) if mesures_dns else None,
         "dns_min":         min(mesures_dns) if mesures_dns else None,
         "dns_max":         max(mesures_dns) if mesures_dns else None,
+        "ttfb_p50":        _mediane(ttfb_mesures),
+        "transfert_p50":   _mediane(transfert_mesures),
         "icmp":            icmp,
         "tcp":             tcp,
         "tls":             tls,
