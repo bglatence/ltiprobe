@@ -83,6 +83,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "tls_expire_expiré": "EXPIRÉ",
         "tls_hsts":          "  HSTS        : {v}",
         "tls_hsts_absent":   "  HSTS        : absent",
+        "webhook_envoye":    "  Webhook → alerte envoyée ({event})",
     },
     "EN": {
         "header":           "ltiprobe ({ver}):\n\n* measuring response times of web sites ({n} attempts)\n* using config file: {cfg}",
@@ -167,6 +168,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "tls_expire_expiré": "EXPIRED",
         "tls_hsts":          "  HSTS        : {v}",
         "tls_hsts_absent":   "  HSTS        : absent",
+        "webhook_envoye":    "  Webhook → alert sent ({event})",
     },
 }
 
