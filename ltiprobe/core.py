@@ -543,11 +543,14 @@ def charger_baseline(fichier):
     import os
     try:
         nom = os.path.basename(fichier)
-        m = re.search(r"(\d{8})_\d{6}", nom)
+        tz_abbr = datetime.now().astimezone().strftime("%Z")
+        m = re.search(r"(\d{8})_(\d{6})", nom)
         if m:
-            date = datetime.strptime(m.group(1), "%Y%m%d").strftime("%Y-%m-%d")
+            dt = datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S")
+            date = dt.strftime("%Y-%m-%d %H:%M") + " " + tz_abbr
         else:
-            date = datetime.fromtimestamp(os.path.getmtime(fichier)).strftime("%Y-%m-%d")
+            dt = datetime.fromtimestamp(os.path.getmtime(fichier))
+            date = dt.strftime("%Y-%m-%d %H:%M") + " " + tz_abbr
 
         # Regrouper toutes les lignes par URL
         rows_par_url: dict[str, list] = {}

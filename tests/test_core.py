@@ -384,7 +384,7 @@ def test_charger_baseline(tmp_path):
     assert entry["p95"] == 145.0
     assert entry["dns_moyenne"] == 8.2
     assert entry["ttfb_p50"] == 28.3
-    assert entry["date"] == "2026-04-20"
+    assert entry["date"].startswith("2026-04-20 14:32")
 
 
 def test_charger_baseline_fichier_absent():
