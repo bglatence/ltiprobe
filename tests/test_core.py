@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pytest
-from ltiprobe.core import mesurer_site, sauvegarder_csv, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions
+from ltiprobe.core import mesurer_site, sauvegarder_csv, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison
 from ltiprobe.i18n import get_translator
 
 
@@ -365,6 +365,102 @@ def test_sauvegarder_csv(tmp_path):
     assert os.path.exists(fichier)
     with open(fichier) as f:
         contenu = f.read()
-    for col in ["url", "p50", "p95", "p99", "hdr_encode", "dns_moyenne"]:
+    for col in ["url", "p50", "p95", "p99", "hdr_encode", "dns_moyenne", "ttfb_p50", "transfert_p50"]:
         assert col in contenu, f"Colonne manquante dans le CSV : {col}"
     assert "https://test.com" in contenu
+
+
+def test_charger_baseline(tmp_path):
+    """charger_baseline() doit parser les valeurs numériques et extraire la date du nom."""
+    csv_path = tmp_path / "resultats_20260420_143200.csv"
+    csv_path.write_text(
+        "url,p50,p95,p99,dns_moyenne,ttfb_p50\n"
+        "https://example.com,38.0,145.0,200.0,8.2,28.3\n"
+    )
+    b = charger_baseline(str(csv_path))
+    assert "https://example.com" in b
+    entry = b["https://example.com"]
+    assert entry["p50"] == 38.0
+    assert entry["p95"] == 145.0
+    assert entry["dns_moyenne"] == 8.2
+    assert entry["ttfb_p50"] == 28.3
+    assert entry["date"].startswith("2026-04-20 14:32")
+
+
+def test_charger_baseline_fichier_absent():
+    """charger_baseline() doit lever FileNotFoundError si le fichier est absent."""
+    with pytest.raises(FileNotFoundError):
+        charger_baseline("/tmp/inexistant_ltiprobe_test.csv")
+
+
+def test_comparer_baseline_regression():
+    """Une hausse ≥ 10% doit être classée régression."""
+    resultat = {"p50": 89.0, "p95": 152.0, "p99": 200.0, "dns_moyenne": 8.0, "ttfb_p50": None}
+    baseline = {"p50": 38.0, "p95": 145.0, "p99": 190.0, "dns_moyenne": 8.5, "ttfb_p50": None}
+    cmp = comparer_baseline(resultat, baseline)
+    noms = {c["nom"]: c for c in cmp}
+    assert noms["HTTP p50"]["statut"] == "regression"
+    assert noms["HTTP p50"]["delta_pct"] == 134
+    assert noms["HTTP p95"]["statut"] == "stable"
+
+
+def test_comparer_baseline_amelioration():
+    """Une baisse doit être classée amélioration."""
+    resultat = {"p50": 30.0, "p95": None, "p99": None, "dns_moyenne": None, "ttfb_p50": None}
+    baseline = {"p50": 38.0, "p95": None, "p99": None, "dns_moyenne": None, "ttfb_p50": None}
+    cmp = comparer_baseline(resultat, baseline)
+    assert cmp[0]["statut"] == "amelioration"
+    assert cmp[0]["delta_pct"] == -21
+
+
+def test_comparer_baseline_metrique_absente():
+    """Une métrique absente dans baseline ou résultat doit être ignorée."""
+    resultat = {"p50": 38.0, "p95": None, "p99": None, "dns_moyenne": None, "ttfb_p50": None}
+    baseline = {"p50": None, "p95": None, "p99": None, "dns_moyenne": None, "ttfb_p50": None}
+    cmp = comparer_baseline(resultat, baseline)
+    assert cmp == []
+
+
+def test_charger_baseline_multi_lignes(tmp_path):
+    """Plusieurs lignes pour une même URL → médiane par colonne."""
+    csv_path = tmp_path / "resultats_20260420_143200.csv"
+    csv_path.write_text(
+        "url,p50,p95,p99,dns_moyenne,ttfb_p50\n"
+        "https://example.com,30.0,100.0,200.0,8.0,20.0\n"
+        "https://example.com,40.0,120.0,220.0,9.0,25.0\n"
+        "https://example.com,50.0,110.0,210.0,7.0,30.0\n"
+    )
+    b = charger_baseline(str(csv_path))
+    entry = b["https://example.com"]
+    # médiane de [30, 40, 50] → 40
+    assert entry["p50"] == 40.0
+    # médiane de [100, 110, 120] → 110
+    assert entry["p95"] == 110.0
+    # médiane de [20, 25, 30] → 25
+    assert entry["ttfb_p50"] == 25.0
+
+
+def test_sauvegarder_csv_comparaison(tmp_path):
+    """Le CSV de comparaison doit contenir les colonnes et valeurs attendues."""
+    resultats = [{
+        "url": "https://example.com",
+        "erreur": False,
+        "baseline_comparaison": {
+            "date": "2026-04-20",
+            "lignes": [
+                {"nom": "HTTP p50", "cle_csv": "http_p50",
+                 "avant": 38.0, "apres": 89.0, "delta_pct": 134, "statut": "regression"},
+                {"nom": "DNS", "cle_csv": "dns",
+                 "avant": 8.2, "apres": 7.1, "delta_pct": -13, "statut": "amelioration"},
+            ],
+        },
+    }]
+    fichier = sauvegarder_csv_comparaison(resultats, str(tmp_path / "cmp.csv"))
+    assert os.path.exists(fichier)
+    with open(fichier) as f:
+        contenu = f.read()
+    assert "http_p50_avant" in contenu
+    assert "http_p50_statut" in contenu
+    assert "regression" in contenu
+    assert "amelioration" in contenu
+    assert "2026-04-20" in contenu

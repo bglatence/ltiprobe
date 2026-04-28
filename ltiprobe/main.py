@@ -3,7 +3,7 @@ import argparse
 import sys
 import time
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from tqdm import tqdm
 from ltiprobe import config, __version__
 from ltiprobe.i18n import get_translator
@@ -13,6 +13,7 @@ from ltiprobe.core import (
     verifier_slo, verifier_assertions,
     mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute,
     detecter_cdn, est_adresse_ip, verifier_ip_joignable,
+    charger_baseline, comparer_baseline, sauvegarder_csv_comparaison,
     SLO_UNITES,
 )
 
@@ -30,6 +31,17 @@ t = get_translator(config.LANGUE)
 
 # Seuil de détection de dégradation : +50% par rapport à l'itération précédente
 SEUIL_DEGRADATION = 0.50
+
+def _heure_scan():
+    """Retourne l'heure locale avec timezone et l'équivalent UTC."""
+    local = datetime.now().astimezone()
+    utc   = datetime.now(timezone.utc)
+    return f"{local.strftime('%H:%M')} {local.strftime('%Z')} / {utc.strftime('%H:%M')} UTC"
+
+def _heure_locale():
+    """Retourne l'heure locale avec abréviation de timezone (pour les alertes)."""
+    local = datetime.now().astimezone()
+    return f"{local.strftime('%H:%M')} {local.strftime('%Z')}"
 
 _NOMS_METRIQUES = {
     "p50":         "p50",
@@ -79,6 +91,10 @@ def parse_arguments():
     parser.add_argument(
         "--interval", type=int, default=None, metavar="SECONDES",
         help="Relancer les mesures toutes les N secondes (monitoring continu)"
+    )
+    parser.add_argument(
+        "--baseline", default=None, metavar="FICHIER",
+        help="CSV de reference pour detecter les regressions de performance"
     )
     return parser.parse_args(), cfg
 
@@ -216,6 +232,23 @@ def afficher_analyse_slo(slo_checks):
     else:
         print(ROUGE + t("slo_bilan_nok", ok=nb_ok, total=nb_total) + RESET)
 
+def afficher_comparaison_baseline(comparaisons, date):
+    if not comparaisons:
+        return
+    print(t("baseline_titre", date=date))
+    for c in comparaisons:
+        signe     = "+" if c["delta_pct"] >= 0 else ""
+        delta_str = (signe + str(c["delta_pct"]) + "%").rjust(6)
+        if c["statut"] == "regression":
+            statut_str = ORANGE + t("baseline_regression") + RESET
+        elif c["statut"] == "amelioration":
+            statut_str = VERT + t("baseline_amelioration") + RESET
+        else:
+            statut_str = VERT + t("baseline_stable") + RESET
+        avant_str = (str(c["avant"]) + " ms").rjust(9)
+        apres_str = (str(c["apres"]) + " ms").ljust(9)
+        print("    " + c["nom"].ljust(10) + ": " + avant_str + " → " + apres_str + "  " + delta_str + "  " + statut_str)
+
 def afficher_http_timing(ttfb_p50, transfert_p50, total_p50):
     if ttfb_p50 is None or transfert_p50 is None:
         return
@@ -224,7 +257,7 @@ def afficher_http_timing(ttfb_p50, transfert_p50, total_p50):
     print(t("transfert", v=transfert_p50))
     print(t("total_p50", v=total_p50))
 
-def afficher_resultat(r, slo_checks=None):
+def afficher_resultat(r, slo_checks=None, comparaison_baseline=None):
     if r["erreur"]:
         print(r["url"] + " -> " + r["message"])
         return
@@ -248,12 +281,15 @@ def afficher_resultat(r, slo_checks=None):
     if r.get("traceroute") is not None:
         afficher_traceroute(r["traceroute"])
     if "icmp" in r or "tcp" in r or "tls" in r:
+        print("")
         afficher_protocoles(r.get("icmp"), r.get("tcp"), r.get("tls"), r.get("p50"), r["url"])
 
     if "cdn_info" in r:
         afficher_cdn(r["cdn_info"])
     afficher_assertions(r.get("assert_checks"))
     afficher_analyse_slo(slo_checks)
+    if comparaison_baseline:
+        afficher_comparaison_baseline(comparaison_baseline["lignes"], comparaison_baseline["date"])
     print("")
 
 # ── Mesure d'un site (une itération) ─────────────────────────────────────────
@@ -445,6 +481,14 @@ def main():
     t = get_translator(cfg.get("langue", "FR").upper())
     verify_tls = not args.no_verify_tls
 
+    baseline = {}
+    if args.baseline:
+        try:
+            baseline = charger_baseline(args.baseline)
+        except (FileNotFoundError, ValueError) as e:
+            print(str(e), file=sys.stderr)
+            sys.exit(1)
+
     if args.sites:
         sites_config = [{"url": s} for s in args.sites]
     else:
@@ -465,8 +509,7 @@ def main():
         while True:
             iteration += 1
             if args.interval:
-                heure = datetime.now().strftime("%H:%M")
-                print(t("intervalle_titre", n=iteration, heure=heure))
+                print(t("intervalle_titre", n=iteration, heure=_heure_scan()))
 
             for site_cfg in sites_config:
                 r = _mesurer_site(site_cfg, args, verify_tls)
@@ -474,11 +517,18 @@ def main():
                     continue
 
                 tous_resultats.append(r)
-                afficher_resultat(r, r.get("slo_checks"))
+                cmp_baseline = None
+                if baseline and not r.get("erreur") and r["url"] in baseline:
+                    entry = baseline[r["url"]]
+                    lignes = comparer_baseline(r, entry)
+                    if lignes:
+                        cmp_baseline = {"lignes": lignes, "date": entry["date"]}
+                r["baseline_comparaison"] = cmp_baseline
+                afficher_resultat(r, r.get("slo_checks"), cmp_baseline)
 
                 url = r["url"]
                 if args.interval and not r.get("erreur") and url in prev_results:
-                    heure_now = datetime.now().strftime("%H:%M")
+                    heure_now = _heure_locale()
                     alertes   = detecter_degradation(r, prev_results[url])
                     if alertes:
                         degraded = set()
@@ -508,6 +558,9 @@ def main():
     if args.csv and tous_resultats:
         fichier = sauvegarder_csv(tous_resultats)
         print(t("csv_sauvegarde", f=fichier))
+        if args.baseline:
+            fichier_cmp = sauvegarder_csv_comparaison(tous_resultats)
+            print(t("csv_comparaison", f=fichier_cmp))
 
 if __name__ == "__main__":
     main()

@@ -485,25 +485,167 @@ def sauvegarder_csv(resultats, fichier=None):
             "url", "moyenne", "min", "max",
             "p50", "p75", "p90", "p95", "p99", "p999",
             "dns_moyenne", "dns_min", "dns_max",
+            "ttfb_p50", "transfert_p50",
             "hdr_encode",
         ])
         writer.writeheader()
         for r in resultats:
             if not r["erreur"]:
                 writer.writerow({
-                    "url":         r.get("url"),
-                    "moyenne":     r.get("moyenne"),
-                    "min":         r.get("min"),
-                    "max":         r.get("max"),
-                    "p50":         r.get("p50"),
-                    "p75":         r.get("p75"),
-                    "p90":         r.get("p90"),
-                    "p95":         r.get("p95"),
-                    "p99":         r.get("p99"),
-                    "p999":        r.get("p999"),
-                    "dns_moyenne": r.get("dns_moyenne"),
-                    "dns_min":     r.get("dns_min"),
-                    "dns_max":     r.get("dns_max"),
-                    "hdr_encode":  r.get("hdr_encode"),
+                    "url":          r.get("url"),
+                    "moyenne":      r.get("moyenne"),
+                    "min":          r.get("min"),
+                    "max":          r.get("max"),
+                    "p50":          r.get("p50"),
+                    "p75":          r.get("p75"),
+                    "p90":          r.get("p90"),
+                    "p95":          r.get("p95"),
+                    "p99":          r.get("p99"),
+                    "p999":         r.get("p999"),
+                    "dns_moyenne":  r.get("dns_moyenne"),
+                    "dns_min":      r.get("dns_min"),
+                    "dns_max":      r.get("dns_max"),
+                    "ttfb_p50":     r.get("ttfb_p50"),
+                    "transfert_p50": r.get("transfert_p50"),
+                    "hdr_encode":   r.get("hdr_encode"),
                 })
+    return nom
+
+# Seuil au-delà duquel une hausse est considérée comme une régression
+_SEUIL_REGRESSION = 0.10
+
+# Métriques comparées : (nom affiché, clé résultat, colonne CSV baseline, préfixe CSV comparaison)
+_METRIQUES_BASELINE = [
+    ("HTTP p50", "p50",         "p50",         "http_p50"),
+    ("HTTP p95", "p95",         "p95",         "http_p95"),
+    ("HTTP p99", "p99",         "p99",         "http_p99"),
+    ("DNS",      "dns_moyenne", "dns_moyenne",  "dns"),
+    ("TTFB p50", "ttfb_p50",   "ttfb_p50",    "ttfb_p50"),
+]
+
+def _mediane_valeurs(valeurs):
+    """Médiane d'une liste de floats (None ignorés). Retourne None si vide."""
+    s = sorted(v for v in valeurs if v is not None)
+    if not s:
+        return None
+    return s[len(s) // 2]
+
+def charger_baseline(fichier):
+    """Charge un CSV de baseline et retourne {url: {colonne: valeur, 'date': str}}.
+
+    Supporte les CSV multi-lignes par URL (issus de --interval) :
+    les valeurs numériques sont agrégées par médiane, ce qui rend la baseline
+    robuste aux spikes transitoires.
+
+    La date est extraite du nom de fichier (resultats_YYYYMMDD_*.csv)
+    ou de la date de modification du fichier.
+    """
+    import os
+    try:
+        nom = os.path.basename(fichier)
+        tz_abbr = datetime.now().astimezone().strftime("%Z")
+        m = re.search(r"(\d{8})_(\d{6})", nom)
+        if m:
+            dt = datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S")
+            date = dt.strftime("%Y-%m-%d %H:%M") + " " + tz_abbr
+        else:
+            dt = datetime.fromtimestamp(os.path.getmtime(fichier))
+            date = dt.strftime("%Y-%m-%d %H:%M") + " " + tz_abbr
+
+        # Regrouper toutes les lignes par URL
+        rows_par_url: dict[str, list] = {}
+        with open(fichier, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                url = row.get("url", "").strip()
+                if url:
+                    rows_par_url.setdefault(url, []).append(row)
+
+        baseline = {}
+        for url, rows in rows_par_url.items():
+            entry: dict = {"date": date}
+            for _, _, col, _ in _METRIQUES_BASELINE:
+                valeurs = []
+                for row in rows:
+                    val = row.get(col, "").strip()
+                    if val:
+                        try:
+                            valeurs.append(float(val))
+                        except ValueError:
+                            pass
+                entry[col] = _mediane_valeurs(valeurs)
+            baseline[url] = entry
+        return baseline
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Fichier baseline introuvable : {fichier}")
+    except Exception as e:
+        raise ValueError(f"Baseline invalide ({fichier}) : {e}")
+
+def comparer_baseline(resultat, baseline_entry):
+    """Compare un résultat avec une entrée baseline.
+
+    Retourne une liste ordonnée de dicts :
+      {nom, cle_csv, avant, apres, delta_pct, statut}
+    Les métriques absentes (avant ou apres None) sont omises.
+    """
+    comparaisons = []
+    for nom, cle_res, col_base, cle_csv in _METRIQUES_BASELINE:
+        avant = baseline_entry.get(col_base)
+        apres = resultat.get(cle_res)
+        if avant is None or apres is None or avant <= 0:
+            continue
+        delta = (apres - avant) / avant
+        if delta >= _SEUIL_REGRESSION:
+            statut = "regression"
+        elif delta < 0:
+            statut = "amelioration"
+        else:
+            statut = "stable"
+        comparaisons.append({
+            "nom":       nom,
+            "cle_csv":   cle_csv,
+            "avant":     round(avant, 1),
+            "apres":     round(apres, 1),
+            "delta_pct": round(delta * 100),
+            "statut":    statut,
+        })
+    return comparaisons
+
+def sauvegarder_csv_comparaison(resultats, fichier=None):
+    """Sauvegarde un rapport de comparaison baseline (une ligne par site, format large).
+
+    Générée uniquement quand --baseline et --csv sont combinés.
+    Colonnes : url, date_baseline, puis pour chaque métrique :
+      {metric}_avant, {metric}_apres, {metric}_delta_pct, {metric}_statut
+    """
+    nom = fichier or "comparaison_" + datetime.now().strftime("%Y%m%d_%H%M%S") + ".csv"
+    fieldnames = ["url", "date_baseline"]
+    for _, _, _, cle_csv in _METRIQUES_BASELINE:
+        fieldnames += [
+            f"{cle_csv}_avant",
+            f"{cle_csv}_apres",
+            f"{cle_csv}_delta_pct",
+            f"{cle_csv}_statut",
+        ]
+    with open(nom, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for r in resultats:
+            cmp = r.get("baseline_comparaison")
+            if not cmp or r.get("erreur"):
+                continue
+            row: dict = {"url": r["url"], "date_baseline": cmp["date"]}
+            par_cle = {c["cle_csv"]: c for c in cmp["lignes"]}
+            for _, _, _, cle_csv in _METRIQUES_BASELINE:
+                c = par_cle.get(cle_csv)
+                if c:
+                    row[f"{cle_csv}_avant"]     = c["avant"]
+                    row[f"{cle_csv}_apres"]     = c["apres"]
+                    row[f"{cle_csv}_delta_pct"] = c["delta_pct"]
+                    row[f"{cle_csv}_statut"]    = c["statut"]
+                else:
+                    row[f"{cle_csv}_avant"]     = ""
+                    row[f"{cle_csv}_apres"]     = ""
+                    row[f"{cle_csv}_delta_pct"] = ""
+                    row[f"{cle_csv}_statut"]    = ""
+            writer.writerow(row)
     return nom
