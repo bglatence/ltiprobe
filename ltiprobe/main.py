@@ -270,6 +270,7 @@ def afficher_resultat(r, slo_checks=None, comparaison_baseline=None):
     if r.get("traceroute") is not None:
         afficher_traceroute(r["traceroute"])
     if "icmp" in r or "tcp" in r or "tls" in r:
+        print("")
         afficher_protocoles(r.get("icmp"), r.get("tcp"), r.get("tls"), r.get("p50"), r["url"])
 
     if "cdn_info" in r:
