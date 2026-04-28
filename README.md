@@ -71,6 +71,16 @@ ltiprobe --csv
 # Show network hop count (traceroute)
 ltiprobe --traceroute
 
+# Continuous monitoring (every 60 seconds, Ctrl+C to stop)
+ltiprobe --interval 60
+ltiprobe --interval 30 -n 5
+
+# Compare with a previously saved baseline
+ltiprobe --baseline resultats_20260420_143200.csv
+
+# Compare and save both results and comparison report
+ltiprobe --baseline resultats_20260420_143200.csv --csv
+
 # Use an alternate config file
 ltiprobe --config-file staging.yaml
 
@@ -88,7 +98,10 @@ ltiprobe --help
 ## Sample output
 
 ```
-Measuring response times (10 attempts)...
+ltiprobe (0.7.0):
+
+* measuring response times of web sites (10 attempts)
+* using config file: ltiprobe.yaml
 
 https://google.com
   HTTP  distribution (10 measurements)
@@ -99,6 +112,10 @@ https://google.com
     p95     :  89.0 ms
     p99     : 145.0 ms
     p99.9   : 145.0 ms
+  HTTP  timing (p50)
+    TTFB       :  28.3 ms  ← server processing
+    Transfer   :   9.7 ms  ← content download
+    Total p50  :  38.0 ms
   Stability : stable       (p99/p50 = 3.8x)
   DNS   -> average: 8.2 ms  min: 6.1  max: 11.4
 
@@ -124,6 +141,10 @@ https://google.com
   dns_ms              8.2 ms  <=   50 ms        ✓ OK
   ────────────────────────────────────────────────────
   Summary: 3/3 objectives met
+
+  ── Comparison vs baseline (2026-04-20 08:00 EDT) ────
+    HTTP p50  :   35.0 ms →   38.0 ms     +9%  ✓ stable
+    DNS       :    9.1 ms →    8.2 ms    -10%  ✓ improvement
 ```
 
 ## Configuration
@@ -181,6 +202,24 @@ If the file is absent, ltiprobe starts with default sites and values.
 | `body_contains` | String expected in the first 4 KB of the body |
 | `header` | `"Key: Value"` (partial match) or `"Key"` (presence check) |
 
+## HTTP timing decomposition (TTFB)
+
+ltiprobe splits each HTTP measurement into two phases with zero additional requests:
+
+| Phase | What is measured |
+|---|---|
+| TTFB | Time to First Byte — server processing time (routing, database, rendering) |
+| Transfer | Time to download the response body |
+
+```
+  HTTP  timing (p50)
+    TTFB       :  28.3 ms  ← server processing
+    Transfer   :   9.7 ms  ← content download
+    Total p50  :  38.0 ms
+```
+
+A high TTFB points to a slow backend. A high Transfer points to a large payload or low bandwidth.
+
 ## Protocol layer comparison
 
 ltiprobe measures all layers in parallel and shows deltas:
@@ -230,6 +269,75 @@ to detect whether the response comes from a CDN cache or the origin server.
 | Akamai | `X-Check-Cacheable` |
 | Varnish | `Via` |
 
+## Continuous monitoring (`--interval`)
+
+```bash
+ltiprobe --interval 60            # measure every 60 seconds
+ltiprobe --interval 30 -n 5       # quick scan, 5 measurements per site
+```
+
+Each scan is labelled with local time, timezone, and UTC:
+
+```
+── Scan #2  22:04 EDT / 00:04 UTC ────────────────────────────────────
+```
+
+ltiprobe automatically detects degradation between scans. An alert is shown when any
+metric increases by more than 50% compared to the previous scan:
+
+```
+  ⚠  p50 : 45ms → 89ms (+98%)  since 22:01 EDT
+  ⚠  ttfb : 28ms → 67ms (+139%)  since 22:01 EDT
+```
+
+The "since" timestamp marks the first detection — it stays fixed if the degradation
+persists across multiple scans, and disappears automatically when the metric recovers.
+
+Press **Ctrl+C** to stop. Results are saved to CSV if `--csv` was specified.
+
+## Baseline comparison (`--baseline`)
+
+Compare the current run against a previously saved CSV to detect regressions between deployments:
+
+```bash
+# Step 1 — save a baseline before deployment
+ltiprobe --csv
+# → resultats_20260420_143200.csv
+
+# Step 2 — compare after deployment
+ltiprobe --baseline resultats_20260420_143200.csv
+```
+
+```
+  ── Comparison vs baseline (2026-04-20 14:32 EDT) ────────────────────
+    HTTP p50  :   38.0 ms →   89.0 ms   +134%  ⚠ regression
+    HTTP p95  :  145.0 ms →  152.0 ms     +5%  ✓ stable
+    DNS       :    8.2 ms →    7.1 ms    -13%  ✓ improvement
+    TTFB p50  :   28.3 ms →   67.0 ms   +137%  ⚠ regression
+```
+
+Regression threshold: **+10%** increase. Metrics compared: `p50`, `p95`, `p99`, `dns`, `ttfb_p50`.
+
+### Comparison CSV report
+
+When `--baseline` and `--csv` are combined, ltiprobe generates two files:
+
+```bash
+ltiprobe --baseline resultats_20260420_143200.csv --csv
+# → resultats_20260427_143200.csv      current measurements
+# → comparaison_20260427_143200.csv    comparison report (wide format)
+```
+
+The comparison CSV contains one row per site with columns
+`http_p50_avant / apres / delta_pct / statut`, `http_p95_*`, `http_p99_*`, `dns_*`, `ttfb_p50_*` —
+ready for Excel, Google Sheets, or a CI pipeline.
+
+### Baseline from continuous monitoring
+
+A baseline generated with `--interval` may contain multiple rows per URL.
+ltiprobe aggregates them by **median** before comparing, making the baseline robust
+against transient spikes.
+
 ## Multi-environment profiles (`--config-file`)
 
 ```bash
@@ -244,8 +352,9 @@ Set `langue: EN` or `langue: FR` in `ltiprobe.yaml`.
 ## CSV export
 
 With `--csv`, ltiprobe generates a timestamped file containing columns
-`average`, `min`, `max`, `p50` through `p999`, `dns_moyenne`, and `hdr_encode`
-(compressed histogram replayable with the [HdrHistogram](https://github.com/HdrHistogram/HdrHistogram_py) library).
+`average`, `min`, `max`, `p50` through `p999`, `dns_moyenne`, `ttfb_p50`, `transfert_p50`,
+and `hdr_encode` (compressed histogram replayable with the
+[HdrHistogram](https://github.com/HdrHistogram/HdrHistogram_py) library).
 
 ## License
 
@@ -288,11 +397,11 @@ ltiprobe --no-verify-tls https://10.0.0.5  # IP avec cert auto-signé
 ltiprobe -n 20                        # 20 mesures par site
 ltiprobe --csv                        # Export CSV
 ltiprobe --traceroute                 # Afficher les hops réseau
+ltiprobe --interval 60                # Monitoring continu toutes les 60s
+ltiprobe --baseline resultats_*.csv   # Comparer avec une baseline
+ltiprobe --baseline resultats_*.csv --csv  # + rapport de comparaison CSV
 ltiprobe --config-file staging.yaml   # Fichier de config alternatif
 ```
-
-> **Nom DNS ou adresse IP** : les deux sont acceptés. En mode IP, la mesure DNS est
-> ignorée (affiché N/A) et la joignabilité est vérifiée avant le démarrage.
 
 ### Configuration (`ltiprobe.yaml`)
 
@@ -318,6 +427,7 @@ sites:
 |---|---|
 | `http_p50_ms` | Latence HTTP médiane (P50) |
 | `http_p95_ms` | Latence HTTP P95 |
+| `http_p99_ms` | Latence HTTP P99 |
 | `dns_ms` | Latence DNS moyenne |
 | `tls_ms` | Durée du handshake TLS |
 | `icmp_ms` | Latence réseau ICMP |
@@ -325,6 +435,75 @@ sites:
 | `http_chaud_ms` | HTTP keep-alive estimé (sans TCP/TLS) |
 | `stabilite_ratio` | Ratio P99/P50 |
 | `nb_hops_max` | Hops réseau max (requiert `--traceroute`) |
+
+### Décomposition TTFB / Transfert
+
+ltiprobe sépare chaque mesure HTTP en deux phases sans requête supplémentaire :
+
+```
+  HTTP  timing (p50)
+    TTFB       :  28.3 ms  ← traitement serveur
+    Transfert  :   9.7 ms  ← téléchargement
+    Total p50  :  38.0 ms
+```
+
+Un TTFB élevé indique un backend lent. Un transfert élevé indique un payload volumineux ou une bande passante limitée.
+
+### Monitoring continu (`--interval`)
+
+```bash
+ltiprobe --interval 60      # mesure toutes les 60 secondes
+ltiprobe --interval 30 -n 5 # scan rapide, 5 mesures par site
+```
+
+Chaque scan affiche l'heure locale avec timezone et l'heure UTC :
+
+```
+── Scan #2  22:04 EDT / 00:04 UTC ────────────────────────────────────
+```
+
+ltiprobe détecte automatiquement les dégradations entre scans (hausse ≥ 50%) :
+
+```
+  ⚠  p50 : 45ms → 89ms (+98%)  depuis 22:01 EDT
+```
+
+Ctrl+C pour arrêter. Les résultats sont sauvegardés en CSV si `--csv` est spécifié.
+
+### Comparaison avec une baseline (`--baseline`)
+
+```bash
+# Étape 1 — sauvegarder une baseline avant déploiement
+ltiprobe --csv
+# → resultats_20260420_143200.csv
+
+# Étape 2 — comparer après déploiement
+ltiprobe --baseline resultats_20260420_143200.csv
+```
+
+```
+  ── Comparaison vs baseline (2026-04-20 14:32 EDT) ───────────────────
+    HTTP p50  :   38.0 ms →   89.0 ms   +134%  ⚠ régression
+    HTTP p95  :  145.0 ms →  152.0 ms     +5%  ✓ stable
+    DNS       :    8.2 ms →    7.1 ms    -13%  ✓ amélioration
+    TTFB p50  :   28.3 ms →   67.0 ms   +137%  ⚠ régression
+```
+
+Seuil de régression : **+10%**. Métriques comparées : `p50`, `p95`, `p99`, `dns`, `ttfb_p50`.
+
+Avec `--baseline` et `--csv` combinés, deux fichiers sont générés :
+- `resultats_*.csv` — mesures actuelles
+- `comparaison_*.csv` — rapport de comparaison (format large, une ligne par site)
+
+Une baseline issue de `--interval` (plusieurs lignes par URL) est agrégée par **médiane**
+avant la comparaison, ce qui la rend robuste aux spikes transitoires.
+
+### Export CSV
+
+Avec `--csv`, ltiprobe génère un fichier horodaté contenant les colonnes
+`moyenne`, `min`, `max`, `p50` à `p999`, `dns_moyenne`, `ttfb_p50`, `transfert_p50`
+et `hdr_encode` (histogramme compressé rejouable avec
+[HdrHistogram](https://github.com/HdrHistogram/HdrHistogram_py)).
 
 ### Licence
 
