@@ -3,7 +3,7 @@ import argparse
 import sys
 import time
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from tqdm import tqdm
 from ltiprobe import config, __version__
 from ltiprobe.i18n import get_translator
@@ -31,6 +31,17 @@ t = get_translator(config.LANGUE)
 
 # Seuil de détection de dégradation : +50% par rapport à l'itération précédente
 SEUIL_DEGRADATION = 0.50
+
+def _heure_scan():
+    """Retourne l'heure locale avec timezone et l'équivalent UTC."""
+    local = datetime.now().astimezone()
+    utc   = datetime.now(timezone.utc)
+    return f"{local.strftime('%H:%M')} {local.strftime('%Z')} / {utc.strftime('%H:%M')} UTC"
+
+def _heure_locale():
+    """Retourne l'heure locale avec abréviation de timezone (pour les alertes)."""
+    local = datetime.now().astimezone()
+    return f"{local.strftime('%H:%M')} {local.strftime('%Z')}"
 
 _NOMS_METRIQUES = {
     "p50":         "p50",
@@ -498,8 +509,7 @@ def main():
         while True:
             iteration += 1
             if args.interval:
-                heure = datetime.now().strftime("%H:%M")
-                print(t("intervalle_titre", n=iteration, heure=heure))
+                print(t("intervalle_titre", n=iteration, heure=_heure_scan()))
 
             for site_cfg in sites_config:
                 r = _mesurer_site(site_cfg, args, verify_tls)
@@ -518,7 +528,7 @@ def main():
 
                 url = r["url"]
                 if args.interval and not r.get("erreur") and url in prev_results:
-                    heure_now = datetime.now().strftime("%H:%M")
+                    heure_now = _heure_locale()
                     alertes   = detecter_degradation(r, prev_results[url])
                     if alertes:
                         degraded = set()
