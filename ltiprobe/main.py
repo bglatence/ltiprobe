@@ -11,10 +11,10 @@ from ltiprobe.core import (
     mesurer_site, sauvegarder_csv, sauvegarder_prometheus,
     creer_histogramme, hdr_enregistrer, hdr_stats,
     verifier_slo, verifier_assertions,
-    mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute,
+    mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute, inspecter_tls,
     detecter_cdn, est_adresse_ip, verifier_ip_joignable,
     charger_baseline, comparer_baseline, sauvegarder_csv_comparaison,
-    SLO_UNITES,
+    SLO_UNITES, _SEUIL_EXPIRY_ALERTE,
 )
 
 # Codes ANSI — désactivés si la sortie n'est pas un terminal (fichier, CI)
@@ -100,6 +100,8 @@ def parse_arguments():
         "--prometheus-out", default=None, metavar="FICHIER",
         help="Exporter les metriques au format Prometheus text (ex: metrics.prom)"
     )
+    parser.add_argument("--tls-info", action="store_true",
+        help="Afficher les informations avancees du certificat TLS (version, cipher, expiry, HSTS)")
     return parser.parse_args(), cfg
 
 # ── Indicateurs colorés ───────────────────────────────────────────────────────
@@ -205,6 +207,34 @@ def afficher_cdn(cdn_info):
     else:
         print(t("cdn_ligne", statut=statut, cdn=cdn_nom, suite=suite))
 
+def afficher_tls_info(tls_info):
+    if tls_info is None:
+        print(t("tls_info_na"))
+        return
+    print(t("tls_info_titre"))
+    print(t("tls_version", v=tls_info["version"]))
+    print(t("tls_cipher",  v=tls_info["cipher"]))
+    print(t("tls_issuer",  v=tls_info["issuer"]))
+    print(t("tls_subject", v=tls_info["subject"]))
+
+    jours = tls_info.get("jours_restants")
+    expire = tls_info.get("expire_date")
+    if expire is not None and jours is not None:
+        date_str = expire.strftime("%Y-%m-%d")
+        if jours < 0:
+            statut = ROUGE + t("tls_expire_expiré") + RESET
+        elif jours <= _SEUIL_EXPIRY_ALERTE:
+            statut = ORANGE + t("tls_expire_alerte", j=jours) + RESET
+        else:
+            statut = VERT + t("tls_expire_ok", j=jours) + RESET
+        print(t("tls_expiry", date=date_str, statut=statut))
+
+    hsts = tls_info.get("hsts")
+    if hsts:
+        print(t("tls_hsts", v=hsts))
+    else:
+        print(t("tls_hsts_absent"))
+
 def afficher_assertions(assert_checks):
     if not assert_checks:
         return
@@ -290,6 +320,8 @@ def afficher_resultat(r, slo_checks=None, comparaison_baseline=None):
 
     if "cdn_info" in r:
         afficher_cdn(r["cdn_info"])
+    if r.get("tls_info") is not None:
+        afficher_tls_info(r["tls_info"])
     afficher_assertions(r.get("assert_checks"))
     afficher_analyse_slo(slo_checks)
     if comparaison_baseline:
@@ -335,6 +367,7 @@ def _mesurer_site(site_cfg, args, verify_tls):
     tls_result       = {}
     tr_result        = {}
     cdn_result       = {}
+    tls_info_result  = {}
 
     icmp_thread = threading.Thread(
         target=lambda: icmp_result.update(
@@ -361,12 +394,19 @@ def _mesurer_site(site_cfg, args, verify_tls):
             {"cdn": detecter_cdn(site, timeout=args.timeout)}
         )
     )
+    tls_info_thread = threading.Thread(
+        target=lambda: tls_info_result.update(
+            {"tls_info": inspecter_tls(hostname, timeout=args.timeout, verify=verify_tls)}
+        )
+    )
 
     icmp_thread.start()
     tcp_thread.start()
     cdn_thread.start()
     if is_https:
         tls_thread.start()
+        if args.tls_info:
+            tls_info_thread.start()
     if args.traceroute:
         tr_thread.start()
 
@@ -397,6 +437,8 @@ def _mesurer_site(site_cfg, args, verify_tls):
     cdn_thread.join()
     if is_https:
         tls_thread.join()
+        if args.tls_info:
+            tls_info_thread.join()
     if args.traceroute:
         tr_thread.join()
 
@@ -444,6 +486,7 @@ def _mesurer_site(site_cfg, args, verify_tls):
         "tls_ms":          tls_moy,
         "http_chaud_ms":   http_chaud,
         "nb_hops":         traceroute["nb_hops"] if traceroute else None,
+        "tls_info":        tls_info_result.get("tls_info") if args.tls_info and is_https else None,
     }
     slo_checks    = verifier_slo(resultat_final, slo) if slo else None
     assert_checks = verifier_assertions(site, asserts, timeout=args.timeout) if asserts else None
