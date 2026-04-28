@@ -610,6 +610,61 @@ def comparer_baseline(resultat, baseline_entry):
         })
     return comparaisons
 
+_PROMETHEUS_METRIQUES = [
+    ("ltiprobe_http_p50_ms",      "p50",            "HTTP response time p50 in milliseconds"),
+    ("ltiprobe_http_p95_ms",      "p95",            "HTTP response time p95 in milliseconds"),
+    ("ltiprobe_http_p99_ms",      "p99",            "HTTP response time p99 in milliseconds"),
+    ("ltiprobe_http_moyenne_ms",  "moyenne",        "HTTP response time mean in milliseconds"),
+    ("ltiprobe_ttfb_p50_ms",      "ttfb_p50",       "Time to first byte p50 in milliseconds"),
+    ("ltiprobe_transfert_p50_ms", "transfert_p50",  "Transfer time p50 in milliseconds"),
+    ("ltiprobe_dns_moyenne_ms",   "dns_moyenne",    "DNS resolution time mean in milliseconds"),
+    ("ltiprobe_icmp_ms",          "icmp_ms",        "ICMP round-trip time mean in milliseconds"),
+    ("ltiprobe_tcp_ms",           "tcp_ms",         "TCP handshake time mean in milliseconds"),
+    ("ltiprobe_tls_ms",           "tls_ms",         "TLS handshake time mean in milliseconds"),
+    ("ltiprobe_stabilite_ratio",  "stabilite_ratio","Stability ratio p99/p50"),
+]
+
+def _prom_label(valeur):
+    """Échappe les caractères spéciaux dans une valeur de label Prometheus."""
+    return valeur.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+def sauvegarder_prometheus(resultats, fichier):
+    """Exporte les métriques au format Prometheus text (compatible node_exporter/Pushgateway)."""
+    lines = []
+
+    for nom_metric, cle_res, help_text in _PROMETHEUS_METRIQUES:
+        valeurs = [
+            (r["url"], r[cle_res])
+            for r in resultats
+            if not r.get("erreur") and r.get(cle_res) is not None
+        ]
+        if not valeurs:
+            continue
+        lines.append(f"# HELP {nom_metric} {help_text}")
+        lines.append(f"# TYPE {nom_metric} gauge")
+        for url, val in valeurs:
+            lines.append(f'{nom_metric}{{url="{_prom_label(url)}"}} {val}')
+
+    slo_lines = []
+    for r in resultats:
+        if r.get("erreur"):
+            continue
+        for cle_slo, c in (r.get("slo_checks") or {}).items():
+            val = 1.0 if c["ok"] else 0.0
+            slo_lines.append(
+                f'ltiprobe_slo_ok{{url="{_prom_label(r["url"])}", slo="{cle_slo}"}} {val}'
+            )
+    if slo_lines:
+        lines.append("# HELP ltiprobe_slo_ok SLO objective met (1) or violated (0)")
+        lines.append("# TYPE ltiprobe_slo_ok gauge")
+        lines.extend(slo_lines)
+
+    with open(fichier, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+        if lines:
+            f.write("\n")
+    return fichier
+
 def sauvegarder_csv_comparaison(resultats, fichier=None):
     """Sauvegarde un rapport de comparaison baseline (une ligne par site, format large).
 

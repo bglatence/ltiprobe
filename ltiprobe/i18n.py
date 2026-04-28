@@ -70,6 +70,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "baseline_regression":   "⚠  régression",
         "baseline_stable":       "✓  stable      ",
         "baseline_amelioration": "✓  amélioration",
+        "prometheus_sauvegarde": "Métriques Prometheus sauvegardées dans : {f}",
     },
     "EN": {
         "header":           "ltiprobe ({ver}):\n\n* measuring response times of web sites ({n} attempts)\n* using config file: {cfg}",
@@ -141,6 +142,7 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "baseline_regression":   "⚠  regression  ",
         "baseline_stable":       "✓  stable      ",
         "baseline_amelioration": "✓  improvement ",
+        "prometheus_sauvegarde": "Prometheus metrics saved to: {f}",
     },
 }
 
