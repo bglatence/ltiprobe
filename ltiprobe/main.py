@@ -8,7 +8,7 @@ from tqdm import tqdm
 from ltiprobe import config, __version__
 from ltiprobe.i18n import get_translator
 from ltiprobe.core import (
-    mesurer_site, sauvegarder_csv,
+    mesurer_site, sauvegarder_csv, sauvegarder_prometheus,
     creer_histogramme, hdr_enregistrer, hdr_stats,
     verifier_slo, verifier_assertions,
     mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute,
@@ -95,6 +95,10 @@ def parse_arguments():
     parser.add_argument(
         "--baseline", default=None, metavar="FICHIER",
         help="CSV de reference pour detecter les regressions de performance"
+    )
+    parser.add_argument(
+        "--prometheus-out", default=None, metavar="FICHIER",
+        help="Exporter les metriques au format Prometheus text (ex: metrics.prom)"
     )
     return parser.parse_args(), cfg
 
@@ -561,6 +565,10 @@ def main():
         if args.baseline:
             fichier_cmp = sauvegarder_csv_comparaison(tous_resultats)
             print(t("csv_comparaison", f=fichier_cmp))
+
+    if args.prometheus_out and tous_resultats:
+        sauvegarder_prometheus(tous_resultats, args.prometheus_out)
+        print(t("prometheus_sauvegarde", f=args.prometheus_out))
 
 if __name__ == "__main__":
     main()

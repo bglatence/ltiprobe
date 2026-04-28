@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pytest
-from ltiprobe.core import mesurer_site, sauvegarder_csv, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison
+from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison
 from ltiprobe.i18n import get_translator
 
 
@@ -438,6 +438,49 @@ def test_charger_baseline_multi_lignes(tmp_path):
     assert entry["p95"] == 110.0
     # médiane de [20, 25, 30] → 25
     assert entry["ttfb_p50"] == 25.0
+
+
+def test_sauvegarder_prometheus(tmp_path):
+    """sauvegarder_prometheus() doit écrire un fichier au format Prometheus text valide."""
+    hist = creer_histogramme()
+    hdr_enregistrer(hist, 42.0)
+    stats = hdr_stats(hist)
+    resultats = [{
+        "url": "https://example.com",
+        "erreur": False,
+        "dns_moyenne": 8.5,
+        "ttfb_p50": 20.0,
+        "transfert_p50": 22.0,
+        "icmp_ms": 12.0,
+        "tcp_ms": 18.0,
+        "tls_ms": 35.0,
+        "stabilite_ratio": 1.5,
+        "slo_checks": {
+            "http_p50_ms": {"seuil": 100, "valeur": 42.0, "ok": True},
+        },
+        **stats,
+    }]
+    fichier = str(tmp_path / "metrics.prom")
+    sauvegarder_prometheus(resultats, fichier)
+    assert os.path.exists(fichier)
+    contenu = open(fichier).read()
+    assert "# HELP ltiprobe_http_p50_ms" in contenu
+    assert "# TYPE ltiprobe_http_p50_ms gauge" in contenu
+    assert 'ltiprobe_http_p50_ms{url="https://example.com"}' in contenu
+    assert "# HELP ltiprobe_slo_ok" in contenu
+    assert 'ltiprobe_slo_ok{url="https://example.com", slo="http_p50_ms"} 1.0' in contenu
+    assert 'ltiprobe_dns_moyenne_ms{url="https://example.com"} 8.5' in contenu
+    assert contenu.endswith("\n")
+
+
+def test_sauvegarder_prometheus_erreur_ignoree(tmp_path):
+    """sauvegarder_prometheus() doit ignorer les résultats en erreur."""
+    resultats = [{"url": "https://bad.com", "erreur": True}]
+    fichier = str(tmp_path / "empty.prom")
+    sauvegarder_prometheus(resultats, fichier)
+    assert os.path.exists(fichier)
+    contenu = open(fichier).read()
+    assert "bad.com" not in contenu
 
 
 def test_sauvegarder_csv_comparaison(tmp_path):
