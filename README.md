@@ -3,7 +3,7 @@
 HTTP/DNS/ICMP/TCP/TLS latency measurement tool with SLO validation, CDN detection, Prometheus export and webhook alerting.
 Displays a complete latency distribution (P50 to P99.9) from the terminal.
 
-[![PyPI version](https://badge.fury.io/py/ltiprobe.svg)](https://pypi.org/project/ltiprobe/)
+[![PyPI version](https://img.shields.io/pypi/v/ltiprobe)](https://pypi.org/project/ltiprobe/)
 
 ## Installation
 
