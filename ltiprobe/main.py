@@ -13,7 +13,7 @@ from ltiprobe.core import (
     verifier_slo, verifier_assertions,
     mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute,
     detecter_cdn, est_adresse_ip, verifier_ip_joignable,
-    charger_baseline, comparer_baseline,
+    charger_baseline, comparer_baseline, sauvegarder_csv_comparaison,
     SLO_UNITES,
 )
 
@@ -512,6 +512,7 @@ def main():
                     lignes = comparer_baseline(r, entry)
                     if lignes:
                         cmp_baseline = {"lignes": lignes, "date": entry["date"]}
+                r["baseline_comparaison"] = cmp_baseline
                 afficher_resultat(r, r.get("slo_checks"), cmp_baseline)
 
                 url = r["url"]
@@ -546,6 +547,9 @@ def main():
     if args.csv and tous_resultats:
         fichier = sauvegarder_csv(tous_resultats)
         print(t("csv_sauvegarde", f=fichier))
+        if args.baseline:
+            fichier_cmp = sauvegarder_csv_comparaison(tous_resultats)
+            print(t("csv_comparaison", f=fichier_cmp))
 
 if __name__ == "__main__":
     main()
