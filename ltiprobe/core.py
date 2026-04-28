@@ -485,25 +485,102 @@ def sauvegarder_csv(resultats, fichier=None):
             "url", "moyenne", "min", "max",
             "p50", "p75", "p90", "p95", "p99", "p999",
             "dns_moyenne", "dns_min", "dns_max",
+            "ttfb_p50", "transfert_p50",
             "hdr_encode",
         ])
         writer.writeheader()
         for r in resultats:
             if not r["erreur"]:
                 writer.writerow({
-                    "url":         r.get("url"),
-                    "moyenne":     r.get("moyenne"),
-                    "min":         r.get("min"),
-                    "max":         r.get("max"),
-                    "p50":         r.get("p50"),
-                    "p75":         r.get("p75"),
-                    "p90":         r.get("p90"),
-                    "p95":         r.get("p95"),
-                    "p99":         r.get("p99"),
-                    "p999":        r.get("p999"),
-                    "dns_moyenne": r.get("dns_moyenne"),
-                    "dns_min":     r.get("dns_min"),
-                    "dns_max":     r.get("dns_max"),
-                    "hdr_encode":  r.get("hdr_encode"),
+                    "url":          r.get("url"),
+                    "moyenne":      r.get("moyenne"),
+                    "min":          r.get("min"),
+                    "max":          r.get("max"),
+                    "p50":          r.get("p50"),
+                    "p75":          r.get("p75"),
+                    "p90":          r.get("p90"),
+                    "p95":          r.get("p95"),
+                    "p99":          r.get("p99"),
+                    "p999":         r.get("p999"),
+                    "dns_moyenne":  r.get("dns_moyenne"),
+                    "dns_min":      r.get("dns_min"),
+                    "dns_max":      r.get("dns_max"),
+                    "ttfb_p50":     r.get("ttfb_p50"),
+                    "transfert_p50": r.get("transfert_p50"),
+                    "hdr_encode":   r.get("hdr_encode"),
                 })
     return nom
+
+# Seuil au-delà duquel une hausse est considérée comme une régression
+_SEUIL_REGRESSION = 0.10
+
+# Métriques comparées : (nom affiché, clé dans resultat, colonne CSV baseline)
+_METRIQUES_BASELINE = [
+    ("HTTP p50", "p50",          "p50"),
+    ("HTTP p95", "p95",          "p95"),
+    ("HTTP p99", "p99",          "p99"),
+    ("DNS",      "dns_moyenne",   "dns_moyenne"),
+    ("TTFB p50", "ttfb_p50",     "ttfb_p50"),
+]
+
+def charger_baseline(fichier):
+    """Charge un CSV de baseline et retourne {url: {colonne: valeur, 'date': str}}.
+
+    La date est extraite du nom de fichier (resultats_YYYYMMDD_*.csv)
+    ou de la date de modification du fichier.
+    """
+    import os
+    try:
+        nom = os.path.basename(fichier)
+        m = re.search(r"(\d{8})_\d{6}", nom)
+        if m:
+            date = datetime.strptime(m.group(1), "%Y%m%d").strftime("%Y-%m-%d")
+        else:
+            date = datetime.fromtimestamp(os.path.getmtime(fichier)).strftime("%Y-%m-%d")
+
+        baseline = {}
+        with open(fichier, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                url = row.get("url", "").strip()
+                if not url:
+                    continue
+                entry = {"date": date}
+                for _, _, col in _METRIQUES_BASELINE:
+                    val = row.get(col, "").strip()
+                    entry[col] = float(val) if val else None
+                baseline[url] = entry
+        return baseline
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Fichier baseline introuvable : {fichier}")
+    except Exception as e:
+        raise ValueError(f"Baseline invalide ({fichier}) : {e}")
+
+def comparer_baseline(resultat, baseline_entry):
+    """Compare un résultat avec une entrée baseline.
+
+    Retourne une liste ordonnée de dicts :
+      {nom, avant, apres, delta_pct, statut}  — statut : 'regression'|'stable'|'amelioration'
+    Les métriques absentes (avant ou apres None) sont omises.
+    """
+    comparaisons = []
+    for nom, cle_res, col_base in _METRIQUES_BASELINE:
+        avant = baseline_entry.get(col_base)
+        apres = resultat.get(cle_res)
+        if avant is None or apres is None or avant <= 0:
+            continue
+        delta = (apres - avant) / avant
+        if delta >= _SEUIL_REGRESSION:
+            statut = "regression"
+        elif delta < 0:
+            statut = "amelioration"
+        else:
+            statut = "stable"
+        comparaisons.append({
+            "nom":       nom,
+            "avant":     round(avant, 1),
+            "apres":     round(apres, 1),
+            "delta_pct": round(delta * 100),
+            "statut":    statut,
+        })
+    return comparaisons

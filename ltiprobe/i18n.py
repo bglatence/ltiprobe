@@ -64,7 +64,11 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "cdn_erreur":       "  Cache  →  information non disponible",
         "intervalle_titre": "\n── Scan #{n}  {heure} ────────────────────────────────────",
         "intervalle_attente": "\n  prochain scan dans {s}s  (Ctrl+C pour arrêter)\n",
-        "degradation_alerte": "  ⚠  {metric} : {avant}ms → {apres}ms (+{pct}%)  depuis {heure}",
+        "degradation_alerte":    "  ⚠  {metric} : {avant}ms → {apres}ms (+{pct}%)  depuis {heure}",
+        "baseline_titre":        "\n  ── Comparaison vs baseline ({date}) ────────────────",
+        "baseline_regression":   "⚠  régression",
+        "baseline_stable":       "✓  stable      ",
+        "baseline_amelioration": "✓  amélioration",
     },
     "EN": {
         "header":           "ltiprobe ({ver}):\n\n* measuring response times of web sites ({n} attempts)\n* using config file: {cfg}",
@@ -130,7 +134,11 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "cdn_erreur":       "  Cache  →  information not available",
         "intervalle_titre": "\n── Scan #{n}  {heure} ────────────────────────────────────",
         "intervalle_attente": "\n  next scan in {s}s  (Ctrl+C to stop)\n",
-        "degradation_alerte": "  ⚠  {metric} : {avant}ms → {apres}ms (+{pct}%)  since {heure}",
+        "degradation_alerte":    "  ⚠  {metric} : {avant}ms → {apres}ms (+{pct}%)  since {heure}",
+        "baseline_titre":        "\n  ── Comparison vs baseline ({date}) ─────────────────",
+        "baseline_regression":   "⚠  regression  ",
+        "baseline_stable":       "✓  stable      ",
+        "baseline_amelioration": "✓  improvement ",
     },
 }
 
