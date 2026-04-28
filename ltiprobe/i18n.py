@@ -3,6 +3,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "FR": {
         "header":           "ltiprobe ({ver}) :\n\n* mesure des temps de réponse de sites web ({n} essais)\n* fichier de configuration : {cfg}",
         "http_dist":        "  HTTP  distribution ({n} mesures)",
+        "http_timing":      "  HTTP  timing (p50)",
+        "ttfb":             "    TTFB       : {v} ms  ← traitement serveur",
+        "transfert":        "    Transfert  : {v} ms  ← téléchargement",
+        "total_p50":        "    Total p50  : {v} ms",
         "moyenne":          "    moyenne : {v} ms   min: {min}   max: {max}",
         "p50":              "    p50     : {v} ms",
         "p75":              "    p75     : {v} ms",
@@ -65,6 +69,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
     "EN": {
         "header":           "ltiprobe ({ver}):\n\n* measuring response times of web sites ({n} attempts)\n* using config file: {cfg}",
         "http_dist":        "  HTTP  distribution ({n} measurements)",
+        "http_timing":      "  HTTP  timing (p50)",
+        "ttfb":             "    TTFB       : {v} ms  ← server processing",
+        "transfert":        "    Transfer   : {v} ms  ← content download",
+        "total_p50":        "    Total p50  : {v} ms",
         "moyenne":          "    average : {v} ms   min: {min}   max: {max}",
         "p50":              "    p50     : {v} ms",
         "p75":              "    p75     : {v} ms",
