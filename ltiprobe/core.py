@@ -550,6 +550,24 @@ def mesurer_site(url, nb_mesures=None, timeout=None, verify_tls=True):
         "transfert_ms": round(sum(transfert_mesures) / len(transfert_mesures), 2) if transfert_mesures else None,
     }
 
+def envoyer_webhook(webhook_url, payload, timeout=5):
+    """Envoie un payload JSON vers un endpoint HTTP POST (webhook).
+
+    Retourne True si la requête aboutit (2xx), False en cas d'erreur.
+    Conçu pour être appelé dans un thread daemon — non-bloquant pour la boucle principale.
+    """
+    import json
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            webhook_url, data=data,
+            headers={"Content-Type": "application/json", "User-Agent": "ltiprobe"}
+        )
+        urllib.request.urlopen(req, timeout=timeout)
+        return True
+    except Exception:
+        return False
+
 def sauvegarder_csv(resultats, fichier=None):
     """Sauvegarde une liste de resultats dans un CSV."""
     nom = fichier or "resultats_" + datetime.now().strftime("%Y%m%d_%H%M%S") + ".csv"

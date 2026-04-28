@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pytest
-from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls
+from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls
 from ltiprobe.i18n import get_translator
 
 
@@ -368,6 +368,39 @@ def test_sauvegarder_csv(tmp_path):
     for col in ["url", "p50", "p95", "p99", "hdr_encode", "dns_moyenne", "ttfb_p50", "transfert_p50"]:
         assert col in contenu, f"Colonne manquante dans le CSV : {col}"
     assert "https://test.com" in contenu
+
+
+def test_envoyer_webhook_succes():
+    """envoyer_webhook() doit retourner True si le serveur répond."""
+    from unittest.mock import patch, MagicMock
+    mock_resp = MagicMock()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    with patch("urllib.request.urlopen", return_value=mock_resp) as mock_open:
+        result = envoyer_webhook("https://example.com/hook", {"event": "test"})
+    assert result is True
+    mock_open.assert_called_once()
+
+
+def test_envoyer_webhook_echec():
+    """envoyer_webhook() doit retourner False si le serveur est injoignable."""
+    from unittest.mock import patch
+    with patch("urllib.request.urlopen", side_effect=Exception("timeout")):
+        result = envoyer_webhook("https://example.com/hook", {"event": "test"})
+    assert result is False
+
+
+def test_envoyer_webhook_payload_json():
+    """envoyer_webhook() doit envoyer un Content-Type application/json."""
+    from unittest.mock import patch, MagicMock
+    appels = []
+    def fake_urlopen(req, timeout):
+        appels.append(req)
+        return MagicMock(__enter__=lambda s: s, __exit__=MagicMock(return_value=False))
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        envoyer_webhook("https://example.com/hook", {"url": "https://test.com", "event": "slo_violation"})
+    assert appels
+    assert appels[0].get_header("Content-type") == "application/json"
 
 
 def test_inspecter_tls_valide():

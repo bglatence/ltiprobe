@@ -8,7 +8,7 @@ from tqdm import tqdm
 from ltiprobe import config, __version__
 from ltiprobe.i18n import get_translator
 from ltiprobe.core import (
-    mesurer_site, sauvegarder_csv, sauvegarder_prometheus,
+    mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook,
     creer_histogramme, hdr_enregistrer, hdr_stats,
     verifier_slo, verifier_assertions,
     mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute, inspecter_tls,
@@ -515,6 +515,18 @@ def detecter_degradation(current, previous):
             alertes.append((metric, round(val_prev, 1), round(val_curr, 1), round(delta * 100)))
     return alertes
 
+# ── Webhook ──────────────────────────────────────────────────────────────────
+
+def _declencher_webhook(webhook_cfg, event, url, data):
+    """Envoie le webhook en arrière-plan (thread daemon, non-bloquant)."""
+    hook_url = (webhook_cfg or {}).get("url", "")
+    if not hook_url:
+        return
+    payload = {"source": "ltiprobe", "event": event, "url": url,
+                "heure": _heure_locale(), **data}
+    threading.Thread(target=envoyer_webhook, args=(hook_url, payload), daemon=True).start()
+    print(t("webhook_envoye", event=event))
+
 # ── Point d'entrée ────────────────────────────────────────────────────────────
 
 def main():
@@ -547,6 +559,8 @@ def main():
     cfg_file = args.config_file or config.FICHIER_DEFAUT
     print(t("header", ver=__version__, n=args.nombre, cfg=cfg_file) + "\n")
 
+    webhook_cfg = cfg.get("webhook")  # {url, on} ou None si absent du YAML
+
     tous_resultats    = []
     prev_results      = {}  # {url: resultat} — dernier résultat réussi par site
     degradation_since = {}  # {url: {metric: heure_str}} — heure de première détection
@@ -573,6 +587,20 @@ def main():
                 r["baseline_comparaison"] = cmp_baseline
                 afficher_resultat(r, r.get("slo_checks"), cmp_baseline)
 
+                # Webhook SLO
+                if webhook_cfg and not r.get("erreur"):
+                    on = webhook_cfg.get("on", "slo_violation")
+                    if on in ("slo_violation", "all"):
+                        slo_checks = r.get("slo_checks") or {}
+                        violations = {k: v for k, v in slo_checks.items() if not v["ok"]}
+                        if violations:
+                            _declencher_webhook(webhook_cfg, "slo_violation", r["url"], {
+                                "violations": [
+                                    {"slo": k, "valeur": v["valeur"], "seuil": v["seuil"]}
+                                    for k, v in violations.items()
+                                ]
+                            })
+
                 url = r["url"]
                 if args.interval and not r.get("erreur") and url in prev_results:
                     heure_now = _heure_locale()
@@ -584,6 +612,13 @@ def main():
                             heure_deg = degradation_since.setdefault(url, {}).setdefault(metric, heure_now)
                             print(ORANGE + t("degradation_alerte", metric=nom, avant=avant, apres=apres, pct=pct, heure=heure_deg) + RESET)
                             degraded.add(metric)
+                        if webhook_cfg and webhook_cfg.get("on", "slo_violation") in ("degradation", "all"):
+                            _declencher_webhook(webhook_cfg, "degradation", url, {
+                                "alertes": [
+                                    {"metric": m, "avant": a, "apres": ap, "delta_pct": p}
+                                    for m, a, ap, p in alertes
+                                ]
+                            })
                         for metric in list(degradation_since.get(url, {}).keys()):
                             if metric not in degraded:
                                 del degradation_since[url][metric]
