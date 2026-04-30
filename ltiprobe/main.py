@@ -136,6 +136,18 @@ def _delta(a, b):
 
 # ── Sections d'affichage ──────────────────────────────────────────────────────
 
+def _fmt_jitter(valeur):
+    """Formate le jitter en ms, ou '—' si absent."""
+    return str(valeur) if valeur is not None else "—"
+
+def _fmt_loss(pct):
+    """Formate le packet loss avec couleur."""
+    if pct is None:
+        return "—"
+    if pct == 0.0:
+        return VERT + "0%" + RESET
+    return ORANGE + str(pct) + "%" + RESET
+
 def afficher_protocoles(icmp, tcp, tls, http_p50, site):
     port     = tcp["port"] if tcp else 443
     icmp_moy = icmp["moyenne"] if icmp else None
@@ -144,18 +156,22 @@ def afficher_protocoles(icmp, tcp, tls, http_p50, site):
 
     print(t("proto_titre"))
     if icmp:
-        print(t("proto_icmp", v=icmp_moy, min=icmp["min"], max=icmp["max"], n=icmp["nb"]))
+        print(t("proto_icmp", v=icmp_moy, min=icmp["min"], max=icmp["max"],
+                jitter=_fmt_jitter(icmp.get("jitter")),
+                loss=_fmt_loss(icmp.get("loss_pct")), n=icmp["nb"]))
     else:
         print(t("proto_icmp_na"))
 
     if tcp:
-        print(t("proto_tcp", p=port, v=tcp_moy, min=tcp["min"], max=tcp["max"])
+        print(t("proto_tcp", p=port, v=tcp_moy, min=tcp["min"], max=tcp["max"],
+                jitter=_fmt_jitter(tcp.get("jitter")))
               + _delta(icmp_moy, tcp_moy))
     else:
         print(t("proto_tcp_na", p=port))
 
     if tls:
-        print(t("proto_tls", v=tls_moy, min=tls["min"], max=tls["max"])
+        print(t("proto_tls", v=tls_moy, min=tls["min"], max=tls["max"],
+                jitter=_fmt_jitter(tls.get("jitter")))
               + _delta(tcp_moy if tcp_moy else icmp_moy, tls_moy))
     elif site.startswith("https://"):
         print(t("proto_tls_na"))
@@ -482,7 +498,10 @@ def _mesurer_site(site_cfg, args, verify_tls):
         "cdn_info":        cdn_info,
         "stabilite_ratio": round(p99 / p50, 2) if p50 > 0 else None,
         "icmp_ms":         icmp["moyenne"] if icmp else None,
+        "icmp_jitter_ms":  icmp["jitter"]   if icmp else None,
+        "icmp_loss_pct":   icmp["loss_pct"] if icmp else None,
         "tcp_ms":          tcp_moy,
+        "tcp_jitter_ms":   tcp["jitter"] if tcp else None,
         "tls_ms":          tls_moy,
         "http_chaud_ms":   http_chaud,
         "nb_hops":         traceroute["nb_hops"] if traceroute else None,

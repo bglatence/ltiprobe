@@ -197,15 +197,34 @@ def test_ltiprobe_yaml_slo_cles():
             assert isinstance(valeur, (int, float)) and valeur > 0, \
                 f"Seuil SLO invalide pour {site['url']}.{cle} : {valeur}"
 
+def test_jitter_calcul():
+    """_jitter doit calculer l'écart-type correct."""
+    from ltiprobe.core import _jitter
+    assert _jitter([10.0, 10.0, 10.0]) == 0.0
+    assert _jitter([10.0, 20.0]) == 5.0
+    assert _jitter([10.0]) is None
+    assert _jitter([]) is None
+
+
+def test_jitter_valeurs_asymetriques():
+    """_jitter doit être insensible à l'ordre des valeurs."""
+    from ltiprobe.core import _jitter
+    j1 = _jitter([10.0, 20.0, 30.0])
+    j2 = _jitter([30.0, 10.0, 20.0])
+    assert j1 == j2
+    assert j1 > 0
+
+
 def test_mesurer_tcp_valide():
-    """Un hôte accessible doit retourner des RTTs TCP positifs."""
+    """Un hôte accessible doit retourner des RTTs TCP positifs avec jitter."""
     from ltiprobe.core import mesurer_tcp
-    r = mesurer_tcp("https://google.com", nb_mesures=2)
+    r = mesurer_tcp("https://google.com", nb_mesures=3)
     assert r is not None
     assert r["moyenne"] > 0
     assert r["min"] <= r["moyenne"] <= r["max"]
-    assert r["nb"] == 2
+    assert r["nb"] == 3
     assert r["port"] == 443
+    assert "jitter" in r
 
 def test_mesurer_tcp_invalide():
     """Un hôte inexistant doit retourner None."""
@@ -247,13 +266,16 @@ def test_mesurer_tls_invalide():
 
 @pytest.mark.skipif(os.getenv("CI") == "true", reason="ICMP bloqué en CI")
 def test_mesurer_icmp_valide():
-    """Un hôte accessible doit retourner des RTTs positifs."""
+    """Un hôte accessible doit retourner des RTTs positifs avec jitter et loss."""
     from ltiprobe.core import mesurer_icmp
-    r = mesurer_icmp("google.com", nb_mesures=2)
+    r = mesurer_icmp("google.com", nb_mesures=5)
     assert r is not None
     assert r["moyenne"] > 0
     assert r["min"] <= r["moyenne"] <= r["max"]
-    assert r["nb"] == 2
+    assert r["nb"] == 5
+    assert "jitter" in r
+    assert "loss_pct" in r
+    assert 0.0 <= r["loss_pct"] <= 100.0
 
 def test_mesurer_icmp_invalide():
     """Un hôte inexistant doit retourner None."""

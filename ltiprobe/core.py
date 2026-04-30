@@ -8,6 +8,7 @@ import subprocess
 import re
 import time
 import csv
+import math
 from datetime import datetime
 from hdrh.histogram import HdrHistogram
 from . import config
@@ -63,6 +64,14 @@ def hdr_stats(hist):
         "hdr_encode": hist.encode(),
     }
 
+def _jitter(valeurs):
+    """Écart-type des RTT (jitter réseau). Retourne None si moins de 2 valeurs."""
+    n = len(valeurs)
+    if n < 2:
+        return None
+    moy = sum(valeurs) / n
+    return round(math.sqrt(sum((x - moy) ** 2 for x in valeurs) / n), 2)
+
 # Correspondance clé SLO → clé dans le dict résultat
 _SLO_VERS_RESULTAT = {
     "http_p50_ms":     "p50",
@@ -74,7 +83,10 @@ _SLO_VERS_RESULTAT = {
     "dns_ms":          "dns_moyenne",
     "stabilite_ratio": "stabilite_ratio",
     "icmp_ms":         "icmp_ms",
+    "icmp_jitter_ms":  "icmp_jitter_ms",
+    "icmp_loss_pct":   "icmp_loss_pct",
     "tcp_ms":          "tcp_ms",
+    "tcp_jitter_ms":   "tcp_jitter_ms",
     "tls_ms":          "tls_ms",
     "http_chaud_ms":   "http_chaud_ms",
     "nb_hops_max":     "nb_hops",
@@ -264,6 +276,7 @@ def mesurer_tcp(hostname, nb_mesures=5, timeout=10):
         "p50":     round(hist.get_value_at_percentile(50) / 1000, 2),
         "nb":      len(rtts),
         "port":    port,
+        "jitter":  _jitter(rtts),
     }
 
 def mesurer_traceroute(hostname, max_hops=30):
@@ -337,6 +350,7 @@ def mesurer_tls(hostname, nb_mesures=5, timeout=10, verify=True):
         "max":     round(max(rtts), 2),
         "p50":     round(hist.get_value_at_percentile(50) / 1000, 2),
         "nb":      len(rtts),
+        "jitter":  _jitter(rtts),
     }
 
 _SEUIL_EXPIRY_ALERTE = 30  # jours avant expiration → alerte
@@ -415,7 +429,7 @@ def inspecter_tls(hostname, timeout=10, verify=True):
 def mesurer_icmp(hostname, nb_mesures=5):
     """Mesure la latence ICMP via la commande ping système.
 
-    Retourne un dict {moyenne, min, max, p50, nb} en ms,
+    Retourne un dict {moyenne, min, max, p50, nb, jitter, loss_pct} en ms,
     ou None si ICMP est bloqué ou indisponible.
     """
     try:
@@ -434,12 +448,15 @@ def mesurer_icmp(hostname, nb_mesures=5):
         hist = creer_histogramme()
         for rtt in rtts:
             hdr_enregistrer(hist, rtt)
+        loss_pct = round((nb_mesures - len(rtts)) / nb_mesures * 100, 1)
         return {
-            "moyenne": round(sum(rtts) / len(rtts), 2),
-            "min":     round(min(rtts), 2),
-            "max":     round(max(rtts), 2),
-            "p50":     round(hist.get_value_at_percentile(50) / 1000, 2),
-            "nb":      len(rtts),
+            "moyenne":  round(sum(rtts) / len(rtts), 2),
+            "min":      round(min(rtts), 2),
+            "max":      round(max(rtts), 2),
+            "p50":      round(hist.get_value_at_percentile(50) / 1000, 2),
+            "nb":       len(rtts),
+            "jitter":   _jitter(rtts),
+            "loss_pct": loss_pct,
         }
     except Exception:
         return None
