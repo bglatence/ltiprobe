@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ltiprobe"
-version = "1.0.1"
+version = "1.1.0"
 description = "HTTP/DNS/ICMP/TCP/TLS latency tool with SLO validation, jitter, packet loss, MOS score (ITU-T G.107), CDN detection, Prometheus export and webhook alerting"
 readme = "README.md"
 license = "MIT"

@@ -339,6 +339,10 @@ def afficher_resultat(r, slo_checks=None, comparaison_baseline=None):
         return
 
     print(r["url"])
+    if r.get("co_correction"):
+        print(VERT + t("co_correction_active",
+                        s=r.get("co_intervalle_s", "?"),
+                        n=r.get("nb_mesures", "?")) + RESET)
     print(t("http_dist", n=r.get("nb_mesures", "?")))
     print(t("moyenne", v=r["moyenne"], min=r["min"], max=r["max"]))
     print(t("p50",  v=r["p50"]))
@@ -455,6 +459,10 @@ def _mesurer_site(site_cfg, args, verify_tls):
     if args.traceroute:
         tr_thread.start()
 
+    # Correction coordinated omission (Gil Tene) : activée uniquement en mode
+    # --interval, où un taux de mesure fixe est défini.
+    intervalle_us = int(args.interval * 1_000_000 / args.nombre) if args.interval else None
+
     with tqdm(
         total=args.nombre,
         desc=site,
@@ -468,7 +476,7 @@ def _mesurer_site(site_cfg, args, verify_tls):
                 tqdm.write(site + " -> " + r["message"])
                 erreur = r
                 break
-            hdr_enregistrer(hist_http, r["moyenne"])
+            hdr_enregistrer(hist_http, r["moyenne"], intervalle_us)
             if r["dns_moyenne"] is not None:
                 mesures_dns.append(r["dns_moyenne"])
             if r.get("ttfb_ms") is not None:
@@ -540,6 +548,8 @@ def _mesurer_site(site_cfg, args, verify_tls):
                                icmp["jitter"]  if icmp else 0.0,
                                icmp["loss_pct"] if icmp else 0.0,
                            )["mos"] if icmp else None,
+        "co_correction":   intervalle_us is not None,
+        "co_intervalle_s": args.interval if intervalle_us else None,
     }
     slo_checks    = verifier_slo(resultat_final, slo) if slo else None
     assert_checks = verifier_assertions(site, asserts, timeout=args.timeout) if asserts else None
