@@ -14,7 +14,7 @@ from ltiprobe.core import (
     mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute, inspecter_tls,
     detecter_cdn, est_adresse_ip, verifier_ip_joignable,
     charger_baseline, comparer_baseline, sauvegarder_csv_comparaison,
-    SLO_UNITES, _SEUIL_EXPIRY_ALERTE,
+    calculer_mos, SLO_UNITES, _SEUIL_EXPIRY_ALERTE,
 )
 
 # Codes ANSI — désactivés si la sortie n'est pas un terminal (fichier, CI)
@@ -251,6 +251,30 @@ def afficher_tls_info(tls_info):
     else:
         print(t("tls_hsts_absent"))
 
+def afficher_scoring_standards(icmp_ms, icmp_jitter_ms, icmp_loss_pct):
+    """Affiche la section Scoring Standards avec le MOS ITU-T G.107."""
+    mos_data = calculer_mos(icmp_ms, icmp_jitter_ms or 0.0, icmp_loss_pct or 0.0)
+    mos  = mos_data["mos"]
+    r    = mos_data["r_factor"]
+    qual = mos_data["qualite"]
+
+    if mos >= 4.0:
+        couleur = VERT
+        statut  = "✓"
+    elif mos >= 3.6:
+        couleur = ORANGE
+        statut  = "~"
+    else:
+        couleur = ROUGE
+        statut  = "✗"
+
+    qualite_str = couleur + t("mos_" + qual) + RESET
+
+    print(t("scoring_titre"))
+    print(t("scoring_mos_titre"))
+    print(t("scoring_r_factor", v=r))
+    print(t("scoring_mos", v=mos, statut=couleur + statut + RESET, qualite=qualite_str))
+
 def afficher_assertions(assert_checks):
     if not assert_checks:
         return
@@ -333,6 +357,9 @@ def afficher_resultat(r, slo_checks=None, comparaison_baseline=None):
     if "icmp" in r or "tcp" in r or "tls" in r:
         print("")
         afficher_protocoles(r.get("icmp"), r.get("tcp"), r.get("tls"), r.get("p50"), r["url"])
+
+    if r.get("icmp_ms") is not None:
+        afficher_scoring_standards(r["icmp_ms"], r.get("icmp_jitter_ms"), r.get("icmp_loss_pct"))
 
     if "cdn_info" in r:
         afficher_cdn(r["cdn_info"])

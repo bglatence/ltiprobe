@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pytest
-from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls
+from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, calculer_mos, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls
 from ltiprobe.i18n import get_translator
 
 
@@ -196,6 +196,49 @@ def test_ltiprobe_yaml_slo_cles():
         for cle, valeur in slo.items():
             assert isinstance(valeur, (int, float)) and valeur > 0, \
                 f"Seuil SLO invalide pour {site['url']}.{cle} : {valeur}"
+
+def test_calculer_mos_excellent():
+    """Conditions idéales → MOS ≥ 4.3 (excellente)."""
+    r = calculer_mos(20.0, 1.0, 0.0)
+    assert r["mos"] >= 4.3
+    assert r["qualite"] == "excellente"
+    assert 80 <= r["r_factor"] <= 100
+
+
+def test_calculer_mos_mauvais():
+    """Forte latence + perte → MOS < 3.1 (mauvaise)."""
+    r = calculer_mos(400.0, 30.0, 5.0)
+    assert r["mos"] < 3.1
+    assert r["qualite"] == "mauvaise"
+
+
+def test_calculer_mos_sans_jitter_loss():
+    """Sans jitter ni perte, seule la latence dégrade le score."""
+    r_faible  = calculer_mos(20.0)
+    r_elevee  = calculer_mos(300.0)
+    assert r_faible["mos"] > r_elevee["mos"]
+
+
+def test_calculer_mos_plafond():
+    """Le MOS ne peut pas dépasser 4.5 ni descendre sous 1.0."""
+    r_ideal = calculer_mos(1.0, 0.0, 0.0)
+    r_pire  = calculer_mos(5000.0, 500.0, 100.0)
+    assert r_ideal["mos"] <= 4.5
+    assert r_pire["mos"] >= 1.0
+
+
+def test_calculer_mos_seuils_qualite():
+    """Chaque niveau de qualité doit être atteignable."""
+    niveaux = {
+        calculer_mos(20.0, 1.0, 0.0)["qualite"],     # excellente
+        calculer_mos(80.0, 5.0, 0.0)["qualite"],     # bonne
+        calculer_mos(150.0, 10.0, 1.0)["qualite"],   # acceptable
+        calculer_mos(250.0, 20.0, 3.0)["qualite"],   # mediocre
+        calculer_mos(400.0, 30.0, 5.0)["qualite"],   # mauvaise
+    }
+    assert "excellente" in niveaux
+    assert "mauvaise"   in niveaux
+
 
 def test_jitter_calcul():
     """_jitter doit calculer l'écart-type correct."""
