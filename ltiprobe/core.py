@@ -88,14 +88,19 @@ _SLO_VERS_RESULTAT = {
     "tcp_ms":          "tcp_ms",
     "tcp_jitter_ms":   "tcp_jitter_ms",
     "tls_ms":          "tls_ms",
+    "mos_min":         "mos",
     "http_chaud_ms":   "http_chaud_ms",
     "nb_hops_max":     "nb_hops",
 }
+
+# Clés SLO où une valeur plus haute est meilleure (seuil = valeur minimale)
+_SLO_MIN_KEYS: set[str] = {"mos_min"}
 
 # Unité d'affichage par clé SLO (défaut : "ms")
 SLO_UNITES: dict[str, str] = {
     "stabilite_ratio": "x",
     "nb_hops_max":     "hops",
+    "mos_min":         "",
 }
 
 def verifier_assertions(url, asserts, timeout=10):
@@ -230,7 +235,8 @@ def detecter_cdn(url, timeout=10):
 def verifier_slo(resultat, slo):
     """Compare un résultat mesuré contre un dict SLO.
 
-    Retourne un dict {cle_slo: {seuil, valeur, ok}} pour chaque clé du SLO.
+    Retourne un dict {cle_slo: {seuil, valeur, ok, op}} pour chaque clé du SLO.
+    Les clés dans _SLO_MIN_KEYS utilisent >= (valeur plus haute = meilleure).
     """
     checks = {}
     for cle_slo, seuil in slo.items():
@@ -240,10 +246,17 @@ def verifier_slo(resultat, slo):
         valeur = resultat.get(cle_res)
         if valeur is None:
             continue
+        if cle_slo in _SLO_MIN_KEYS:
+            ok = valeur >= seuil
+            op = ">="
+        else:
+            ok = valeur <= seuil
+            op = "<="
         checks[cle_slo] = {
             "seuil":  seuil,
             "valeur": valeur,
-            "ok":     valeur <= seuil,
+            "ok":     ok,
+            "op":     op,
         }
     return checks
 

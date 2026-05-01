@@ -147,8 +147,9 @@ def test_config_yaml(tmp_path):
 _CLES_SLO_VALIDES = {
     "http_p50_ms", "http_p75_ms", "http_p90_ms",
     "http_p95_ms", "http_p99_ms", "http_p999_ms", "dns_ms",
-    "stabilite_ratio", "icmp_ms", "tcp_ms", "tls_ms",
-    "http_chaud_ms", "nb_hops_max",
+    "stabilite_ratio", "icmp_ms", "icmp_jitter_ms", "icmp_loss_pct",
+    "tcp_ms", "tcp_jitter_ms", "tls_ms",
+    "http_chaud_ms", "nb_hops_max", "mos_min",
 }
 
 def test_ltiprobe_yaml_existe():
@@ -238,6 +239,30 @@ def test_calculer_mos_seuils_qualite():
     }
     assert "excellente" in niveaux
     assert "mauvaise"   in niveaux
+
+
+def test_verifier_slo_mos_min_respect():
+    """mos_min : MOS >= seuil → ok=True, op='>='."""
+    resultat = {"mos": 4.1}
+    checks = verifier_slo(resultat, {"mos_min": 4.0})
+    assert checks["mos_min"]["ok"] is True
+    assert checks["mos_min"]["op"] == ">="
+
+
+def test_verifier_slo_mos_min_violation():
+    """mos_min : MOS < seuil → ok=False."""
+    resultat = {"mos": 3.5}
+    checks = verifier_slo(resultat, {"mos_min": 4.0})
+    assert checks["mos_min"]["ok"] is False
+    assert checks["mos_min"]["op"] == ">="
+
+
+def test_verifier_slo_op_field_standard():
+    """Les clés SLO standards doivent avoir op='<='."""
+    resultat = {"p50": 100.0, "dns_moyenne": 30.0}
+    checks = verifier_slo(resultat, {"http_p50_ms": 200, "dns_ms": 50})
+    assert checks["http_p50_ms"]["op"] == "<="
+    assert checks["dns_ms"]["op"] == "<="
 
 
 def test_jitter_calcul():
