@@ -671,7 +671,7 @@ def main():
 
     reseau_info = detecter_reseau()
     afficher_reseau(reseau_info)
-    print("")
+    print(t("mesures_titre"))
 
     webhook_cfg = cfg.get("webhook")  # {url, on} ou None si absent du YAML
 
