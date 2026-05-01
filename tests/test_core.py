@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pytest
-from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, calculer_mos, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls
+from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, calculer_mos, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls, mesurer_dns_ttl
 from ltiprobe.i18n import get_translator
 
 
@@ -333,6 +333,27 @@ def test_mesurer_tls_valide():
     assert r["moyenne"] > 0
     assert r["min"] <= r["moyenne"] <= r["max"]
     assert r["nb"] == 2
+
+def test_mesurer_dns_ttl_valide():
+    """Un hôte accessible doit retourner reseau_ms, cache_ms et ttl_s."""
+    r = mesurer_dns_ttl("google.com")
+    assert r is not None
+    assert r["reseau_ms"] is not None and r["reseau_ms"] > 0
+    assert r["cache_ms"] is not None and r["cache_ms"] >= 0
+    assert r["ttl_s"] is not None and r["ttl_s"] > 0
+    # Le cache OS doit être significativement plus rapide que la résolution réseau
+    assert r["cache_ms"] < r["reseau_ms"]
+
+def test_mesurer_dns_ttl_invalide():
+    """Un hôte inexistant doit retourner None."""
+    r = mesurer_dns_ttl("hote.inexistant.invalid")
+    assert r is None
+
+def test_mesurer_dns_ttl_structure():
+    """Le dict retourné doit contenir exactement les clés attendues."""
+    r = mesurer_dns_ttl("google.com")
+    assert r is not None
+    assert set(r.keys()) == {"reseau_ms", "cache_ms", "ttl_s"}
 
 @pytest.mark.skipif(os.getenv("CI") == "true", reason="traceroute bloqué en CI")
 def test_mesurer_traceroute_valide():

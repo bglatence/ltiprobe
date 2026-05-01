@@ -14,7 +14,7 @@ from ltiprobe.core import (
     mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute, inspecter_tls,
     detecter_cdn, est_adresse_ip, verifier_ip_joignable,
     charger_baseline, comparer_baseline, sauvegarder_csv_comparaison,
-    calculer_mos, SLO_UNITES, _SEUIL_EXPIRY_ALERTE,
+    calculer_mos, mesurer_dns_ttl, SLO_UNITES, _SEUIL_EXPIRY_ALERTE,
 )
 
 # Codes ANSI — désactivés si la sortie n'est pas un terminal (fichier, CI)
@@ -223,6 +223,20 @@ def afficher_cdn(cdn_info):
     else:
         print(t("cdn_ligne", statut=statut, cdn=cdn_nom, suite=suite))
 
+def afficher_dns_ttl(dns_ttl):
+    if dns_ttl is None:
+        return
+    print(t("dns_ttl_titre"))
+    if dns_ttl.get("reseau_ms") is not None:
+        print(t("dns_ttl_reseau", v=dns_ttl["reseau_ms"]))
+    if dns_ttl.get("cache_ms") is not None:
+        couleur = VERT if (
+            dns_ttl.get("reseau_ms") and dns_ttl["cache_ms"] < dns_ttl["reseau_ms"] * 0.3
+        ) else RESET
+        print(couleur + t("dns_ttl_cache", v=dns_ttl["cache_ms"]) + RESET)
+    if dns_ttl.get("ttl_s") is not None:
+        print(t("dns_ttl_valeur", s=dns_ttl["ttl_s"]))
+
 def afficher_tls_info(tls_info):
     if tls_info is None:
         print(t("tls_info_na"))
@@ -357,6 +371,7 @@ def afficher_resultat(r, slo_checks=None, comparaison_baseline=None):
         print(t("dns_ip_na"))
     else:
         print(t("dns", v=r["dns_moyenne"], min=r["dns_min"], max=r["dns_max"]))
+        afficher_dns_ttl(r.get("dns_ttl"))
 
     if r.get("traceroute") is not None:
         afficher_traceroute(r["traceroute"])
@@ -417,6 +432,7 @@ def _mesurer_site(site_cfg, args, verify_tls):
     tr_result        = {}
     cdn_result       = {}
     tls_info_result  = {}
+    dns_ttl_result   = {}
 
     icmp_thread = threading.Thread(
         target=lambda: icmp_result.update(
@@ -448,10 +464,17 @@ def _mesurer_site(site_cfg, args, verify_tls):
             {"tls_info": inspecter_tls(hostname, timeout=args.timeout, verify=verify_tls)}
         )
     )
+    dns_ttl_thread = threading.Thread(
+        target=lambda: dns_ttl_result.update(
+            {"dns_ttl": mesurer_dns_ttl(hostname, timeout=args.timeout)}
+        )
+    )
 
     icmp_thread.start()
     tcp_thread.start()
     cdn_thread.start()
+    if not ip_mode:
+        dns_ttl_thread.start()
     if is_https:
         tls_thread.start()
         if args.tls_info:
@@ -488,6 +511,8 @@ def _mesurer_site(site_cfg, args, verify_tls):
     icmp_thread.join()
     tcp_thread.join()
     cdn_thread.join()
+    if not ip_mode:
+        dns_ttl_thread.join()
     if is_https:
         tls_thread.join()
         if args.tls_info:
@@ -550,6 +575,7 @@ def _mesurer_site(site_cfg, args, verify_tls):
                            )["mos"] if icmp else None,
         "co_correction":   intervalle_us is not None,
         "co_intervalle_s": args.interval if intervalle_us else None,
+        "dns_ttl":         dns_ttl_result.get("dns_ttl") if not ip_mode else None,
     }
     slo_checks    = verifier_slo(resultat_final, slo) if slo else None
     assert_checks = verifier_assertions(site, asserts, timeout=args.timeout) if asserts else None
