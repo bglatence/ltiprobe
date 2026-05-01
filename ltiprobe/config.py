@@ -8,6 +8,7 @@ _DEFAULTS = {
     "nb_mesures": 10,
     "timeout":    10,
     "langue":     "FR",
+    "verbosity":  "full",
     "sites": [
         {"url": "https://google.com"},
         {"url": "https://github.com"},

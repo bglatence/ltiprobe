@@ -102,6 +102,11 @@ def parse_arguments():
     )
     parser.add_argument("--tls-info", action="store_true",
         help="Afficher les informations avancees du certificat TLS (version, cipher, expiry, HSTS)")
+    parser.add_argument(
+        "--verbosity", choices=["basic", "full"], default=cfg.get("verbosity", "full"),
+        metavar="NIVEAU",
+        help="Niveau de detail des resultats : basic (mesures HTTP/DNS/SLO) ou full (toutes les sections) (defaut: %(default)s)"
+    )
     return parser.parse_args(), cfg
 
 # ── Indicateurs colorés ───────────────────────────────────────────────────────
@@ -368,7 +373,9 @@ def afficher_http_timing(ttfb_p50, transfert_p50, total_p50):
     print(t("transfert", v=transfert_p50))
     print(t("total_p50", v=total_p50))
 
-def afficher_resultat(r, slo_checks=None, comparaison_baseline=None):
+def afficher_resultat(r, slo_checks=None, comparaison_baseline=None, verbosity="full"):
+    full = verbosity == "full"
+
     if r["erreur"]:
         print(r["url"] + " -> " + r["message"])
         return
@@ -386,28 +393,30 @@ def afficher_resultat(r, slo_checks=None, comparaison_baseline=None):
     print(t("p95",  v=r["p95"]))
     print(t("p99",  v=r["p99"]))
     print(t("p999", v=r["p999"]))
-    afficher_http_timing(r.get("ttfb_p50"), r.get("transfert_p50"), r.get("p50"))
+    if full:
+        afficher_http_timing(r.get("ttfb_p50"), r.get("transfert_p50"), r.get("p50"))
     print(t("stabilite") + indicateur_stabilite(r["p50"], r["p99"]))
     if r.get("ip_mode"):
         print(t("dns_ip_na"))
     else:
         print(t("dns", v=r["dns_moyenne"], min=r["dns_min"], max=r["dns_max"]))
-        afficher_dns_ttl(r.get("dns_ttl"))
+        if full:
+            afficher_dns_ttl(r.get("dns_ttl"))
 
-    if r.get("traceroute") is not None:
-        afficher_traceroute(r["traceroute"])
-    if "icmp" in r or "tcp" in r or "tls" in r:
-        print("")
-        afficher_protocoles(r.get("icmp"), r.get("tcp"), r.get("tls"), r.get("p50"), r["url"])
+    if full:
+        if r.get("traceroute") is not None:
+            afficher_traceroute(r["traceroute"])
+        if "icmp" in r or "tcp" in r or "tls" in r:
+            print("")
+            afficher_protocoles(r.get("icmp"), r.get("tcp"), r.get("tls"), r.get("p50"), r["url"])
+        if r.get("icmp_ms") is not None:
+            afficher_scoring_standards(r["icmp_ms"], r.get("icmp_jitter_ms"), r.get("icmp_loss_pct"))
+        if "cdn_info" in r:
+            afficher_cdn(r["cdn_info"])
+        if r.get("tls_info") is not None:
+            afficher_tls_info(r["tls_info"])
+        afficher_assertions(r.get("assert_checks"))
 
-    if r.get("icmp_ms") is not None:
-        afficher_scoring_standards(r["icmp_ms"], r.get("icmp_jitter_ms"), r.get("icmp_loss_pct"))
-
-    if "cdn_info" in r:
-        afficher_cdn(r["cdn_info"])
-    if r.get("tls_info") is not None:
-        afficher_tls_info(r["tls_info"])
-    afficher_assertions(r.get("assert_checks"))
     afficher_analyse_slo(slo_checks)
     if comparaison_baseline:
         afficher_comparaison_baseline(comparaison_baseline["lignes"], comparaison_baseline["date"])
@@ -699,7 +708,7 @@ def main():
                     if lignes:
                         cmp_baseline = {"lignes": lignes, "date": entry["date"]}
                 r["baseline_comparaison"] = cmp_baseline
-                afficher_resultat(r, r.get("slo_checks"), cmp_baseline)
+                afficher_resultat(r, r.get("slo_checks"), cmp_baseline, args.verbosity)
 
                 # Webhook SLO
                 if webhook_cfg and not r.get("erreur"):
