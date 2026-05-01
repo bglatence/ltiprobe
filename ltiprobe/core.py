@@ -112,6 +112,164 @@ SLO_UNITES: dict[str, str] = {
     "mos_min":         "",
 }
 
+def lister_interfaces(interface_active=None):
+    """Liste toutes les interfaces réseau physiques disponibles sur l'hôte.
+
+    Retourne une liste de dicts {device, type, actif} ou [] si indisponible.
+    'actif' est True pour l'interface utilisée pour les mesures.
+
+    macOS : networksetup -listallhardwareports (noms lisibles officiels)
+    Linux : ip link show + déduction du type depuis le préfixe du nom
+    """
+    import platform
+
+    interfaces = []
+    sys_name = platform.system()
+
+    if sys_name == "Darwin":
+        try:
+            out = subprocess.check_output(
+                ["networksetup", "-listallhardwareports"],
+                text=True, timeout=5, stderr=subprocess.DEVNULL
+            )
+            current: dict = {}
+            for line in out.splitlines():
+                if line.startswith("Hardware Port:"):
+                    current["type"] = line.split(":", 1)[1].strip()
+                elif line.startswith("Device:"):
+                    current["device"] = line.split(":", 1)[1].strip()
+                elif not line.strip() and "device" in current:
+                    interfaces.append({
+                        "device": current["device"],
+                        "type":   current.get("type", ""),
+                        "actif":  current["device"] == interface_active,
+                    })
+                    current = {}
+            if "device" in current:
+                interfaces.append({
+                    "device": current["device"],
+                    "type":   current.get("type", ""),
+                    "actif":  current["device"] == interface_active,
+                })
+        except Exception:
+            pass
+
+    elif sys_name == "Linux":
+        _TYPE_PREFIXES = [
+            ("wl",      "Wi-Fi"),
+            ("wlan",    "Wi-Fi"),
+            ("eth",     "Ethernet"),
+            ("en",      "Ethernet"),
+            ("bt",      "Bluetooth"),
+            ("bnep",    "Bluetooth"),
+            ("tun",     "VPN"),
+            ("tap",     "VPN"),
+            ("docker",  "Bridge"),
+            ("br",      "Bridge"),
+            ("virbr",   "Bridge"),
+        ]
+        try:
+            out = subprocess.check_output(
+                ["ip", "link", "show"], text=True, timeout=5,
+                stderr=subprocess.DEVNULL
+            )
+            for line in out.splitlines():
+                m = re.match(r"^\d+:\s+(\S+?)(?:@\S+)?:", line)
+                if not m:
+                    continue
+                dev = m.group(1)
+                if dev in ("lo",):
+                    continue
+                itype = next(
+                    (t for p, t in _TYPE_PREFIXES if dev.startswith(p)), ""
+                )
+                interfaces.append({
+                    "device": dev,
+                    "type":   itype,
+                    "actif":  dev == interface_active,
+                })
+        except Exception:
+            pass
+
+    return interfaces
+
+def detecter_reseau(timeout=5):
+    """Détecte l'interface réseau active, l'IP locale et l'identité publique.
+
+    Retourne un dict :
+      local_ip    : str | None        — IP locale de l'interface sortante
+      interface   : str | None        — nom de l'interface (ex: "en0", "eth0")
+      interfaces  : list[dict]        — toutes les interfaces disponibles
+      public_ip   : str | None        — IP publique vue depuis internet
+      isp         : str | None        — nom du fournisseur d'accès (FAI)
+      as_info     : str | None        — numéro AS (ex: "AS812 Bell Canada")
+      pays        : str | None        — pays (ex: "Canada")
+      pays_code   : str | None        — code pays ISO (ex: "CA")
+    """
+    import platform
+    import json
+
+    result: dict = {}
+
+    # IP locale via socket UDP sans envoi de données réelles
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(2)
+        sock.connect(("8.8.8.8", 80))
+        result["local_ip"] = sock.getsockname()[0]
+        sock.close()
+    except Exception:
+        result["local_ip"] = None
+
+    # Interface réseau (platform-specific)
+    result["interface"] = None
+    try:
+        sys_name = platform.system()
+        if sys_name == "Darwin":
+            out = subprocess.check_output(
+                ["route", "get", "8.8.8.8"], text=True, timeout=3,
+                stderr=subprocess.DEVNULL
+            )
+            for line in out.splitlines():
+                if "interface:" in line:
+                    result["interface"] = line.split(":")[-1].strip()
+                    break
+        elif sys_name == "Linux":
+            out = subprocess.check_output(
+                ["ip", "route", "get", "8.8.8.8"], text=True, timeout=3,
+                stderr=subprocess.DEVNULL
+            )
+            m = re.search(r"\bdev\s+(\S+)", out)
+            if m:
+                result["interface"] = m.group(1)
+    except Exception:
+        pass
+
+    # Liste de toutes les interfaces disponibles sur l'hôte
+    result["interfaces"] = lister_interfaces(result.get("interface"))
+
+    # IP publique + FAI via ip-api.com (service libre, pas d'authentification)
+    result.update({"public_ip": None, "isp": None, "as_info": None,
+                   "pays": None, "pays_code": None})
+    try:
+        fields = "status,country,countryCode,isp,as,query"
+        req = urllib.request.Request(
+            f"http://ip-api.com/json/?fields={fields}",
+            headers={"User-Agent": "ltiprobe"}
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read().decode())
+        if data.get("status") == "success":
+            result["public_ip"] = data.get("query")
+            result["isp"]       = data.get("isp")
+            result["as_info"]   = data.get("as")
+            result["pays"]      = data.get("country")
+            result["pays_code"] = data.get("countryCode")
+    except Exception:
+        pass
+
+    return result if any(v is not None for v in result.values()) else None
+
 def verifier_assertions(url, asserts, timeout=10):
     """Effectue une requête et vérifie les assertions déclarées dans le YAML.
 

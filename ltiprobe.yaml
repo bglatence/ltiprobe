@@ -10,6 +10,12 @@ timeout: 10
 # Langue d'affichage : FR (français) ou EN (anglais)
 langue: EN
 
+# Niveau de détail des résultats
+#   basic — HTTP percentiles, DNS, stabilité, SLO
+#   full  — basic + HTTP timing, DNS cache/TTL, Protocol comparison,
+#            Scoring Standards (MOS), Cache/CDN, TLS Certificate, Assertions
+verbosity: full
+
 # Liste des sites à mesurer
 # Chaque site peut définir un SLO (Service Level Objective) optionnel.
 # Clés SLO disponibles :
