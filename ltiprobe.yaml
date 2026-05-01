@@ -22,10 +22,14 @@ langue: EN
 #   dns_ms          — latence DNS moyenne
 #   stabilite_ratio — ratio p99/p50 (ex: 1.5 signifie p99 <= 1.5x p50)
 #   icmp_ms         — latence ICMP (réseau) moyenne
+#   icmp_jitter_ms  — jitter ICMP (écart-type des RTT)
+#   icmp_loss_pct   — taux de perte ICMP en % (ex: 5 = max 5% de perte)
 #   tcp_ms          — latence handshake TCP moyenne
+#   tcp_jitter_ms   — jitter TCP (écart-type des RTT)
 #   tls_ms          — latence handshake TLS moyenne
 #   http_chaud_ms   — latence HTTP estimée keep-alive (sans TCP/TLS)
 #   nb_hops_max     — nombre de hops maximum (requiert --traceroute)
+#   mos_min         — score MOS ITU-T G.107 minimum (plus haut = meilleur, ex: 3.6)
 #
 # Assertions de validation HTTP (clé "assert") :
 #   status_code     — code HTTP attendu (ex: 200)
@@ -43,16 +47,14 @@ sites:
       status_code: 200
       body_contains: "google"
 
-  - url: https://www.latencetech.com
+  - url: https://youtube.com
     slo:
       http_p50_ms: 300
       http_p95_ms: 600
       dns_ms: 80
-
-  - url: https://youtube.com
-    slo:
-      http_p50_ms: 250
-      http_p95_ms: 500
+      icmp_ms: 50
+      icmp_loss_pct: 5
+      mos_min: 3.6      # qualité VoIP "acceptable" selon ITU-T G.107
 
   - url: https://apple.com
     # aucun SLO défini pour ce site
