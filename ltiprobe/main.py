@@ -294,10 +294,12 @@ def afficher_analyse_slo(slo_checks):
     largeur_cle = max(len(c) for c in slo_checks) + 2
     for cle, c in slo_checks.items():
         unite  = SLO_UNITES.get(cle, "ms")
-        valeur = str(c["valeur"]) + " " + unite
-        seuil  = str(c["seuil"])  + " " + unite
+        sep    = " " if unite else ""
+        valeur = str(c["valeur"]) + sep + unite
+        seuil  = str(c["seuil"])  + sep + unite
+        op     = c.get("op", "<=")
         statut = (VERT + t("slo_check_ok") + RESET) if c["ok"] else (ROUGE + t("slo_check_nok") + RESET)
-        print("  " + cle.ljust(largeur_cle) + valeur.rjust(12) + "  <=  " + seuil.ljust(12) + statut)
+        print("  " + cle.ljust(largeur_cle) + valeur.rjust(12) + f"  {op}  " + seuil.ljust(12) + statut)
     print("  " + "─" * 52)
     nb_ok    = sum(1 for c in slo_checks.values() if c["ok"])
     nb_total = len(slo_checks)
@@ -533,6 +535,11 @@ def _mesurer_site(site_cfg, args, verify_tls):
         "http_chaud_ms":   http_chaud,
         "nb_hops":         traceroute["nb_hops"] if traceroute else None,
         "tls_info":        tls_info_result.get("tls_info") if args.tls_info and is_https else None,
+        "mos":             calculer_mos(
+                               icmp["moyenne"] if icmp else 0.0,
+                               icmp["jitter"]  if icmp else 0.0,
+                               icmp["loss_pct"] if icmp else 0.0,
+                           )["mos"] if icmp else None,
     }
     slo_checks    = verifier_slo(resultat_final, slo) if slo else None
     assert_checks = verifier_assertions(site, asserts, timeout=args.timeout) if asserts else None
