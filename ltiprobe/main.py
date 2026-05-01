@@ -141,9 +141,13 @@ def _delta(a, b):
 
 # ── Sections d'affichage ──────────────────────────────────────────────────────
 
+def _fmt_ms(v):
+    """Formate une valeur ms avec une décimale (ex: 23.4), ou '—' si None."""
+    return f"{v:.1f}" if v is not None else "—"
+
 def _fmt_jitter(valeur):
-    """Formate le jitter en ms, ou '—' si absent."""
-    return str(valeur) if valeur is not None else "—"
+    """Formate le jitter en ms avec une décimale, ou '—' si absent."""
+    return f"{valeur:.1f}" if valeur is not None else "—"
 
 def _fmt_loss(pct):
     """Formate le packet loss avec couleur."""
@@ -161,21 +165,21 @@ def afficher_protocoles(icmp, tcp, tls, http_p50, site):
 
     print(t("proto_titre"))
     if icmp:
-        print(t("proto_icmp", v=icmp_moy, min=icmp["min"], max=icmp["max"],
+        print(t("proto_icmp", v=_fmt_ms(icmp_moy), min=_fmt_ms(icmp["min"]), max=_fmt_ms(icmp["max"]),
                 jitter=_fmt_jitter(icmp.get("jitter")),
                 loss=_fmt_loss(icmp.get("loss_pct")), n=icmp["nb"]))
     else:
         print(t("proto_icmp_na"))
 
     if tcp:
-        print(t("proto_tcp", p=port, v=tcp_moy, min=tcp["min"], max=tcp["max"],
+        print(t("proto_tcp", p=port, v=_fmt_ms(tcp_moy), min=_fmt_ms(tcp["min"]), max=_fmt_ms(tcp["max"]),
                 jitter=_fmt_jitter(tcp.get("jitter")))
               + _delta(icmp_moy, tcp_moy))
     else:
         print(t("proto_tcp_na", p=port))
 
     if tls:
-        print(t("proto_tls", v=tls_moy, min=tls["min"], max=tls["max"],
+        print(t("proto_tls", v=_fmt_ms(tls_moy), min=_fmt_ms(tls["min"]), max=_fmt_ms(tls["max"]),
                 jitter=_fmt_jitter(tls.get("jitter")))
               + _delta(tcp_moy if tcp_moy else icmp_moy, tls_moy))
     elif site.startswith("https://"):
@@ -183,11 +187,11 @@ def afficher_protocoles(icmp, tcp, tls, http_p50, site):
 
     if http_p50:
         prev = tls_moy or tcp_moy or icmp_moy
-        print(t("proto_http_froid", v=http_p50) + _delta(prev, http_p50))
+        print(t("proto_http_froid", v=_fmt_ms(http_p50)) + _delta(prev, http_p50))
         surcharge = round((tcp_moy or 0) + (tls_moy or 0), 1)
         http_chaud = round(http_p50 - surcharge, 1)
         if surcharge > 0 and http_chaud > 0:
-            print(t("proto_http_chaud", v=http_chaud))
+            print(t("proto_http_chaud", v=_fmt_ms(http_chaud)))
 
 def afficher_traceroute(tr):
     if tr is None:
@@ -254,12 +258,12 @@ def afficher_dns_ttl(dns_ttl):
         return
     print(t("dns_ttl_titre"))
     if dns_ttl.get("reseau_ms") is not None:
-        print(t("dns_ttl_reseau", v=dns_ttl["reseau_ms"]))
+        print(t("dns_ttl_reseau", v=_fmt_ms(dns_ttl["reseau_ms"])))
     if dns_ttl.get("cache_ms") is not None:
         couleur = VERT if (
             dns_ttl.get("reseau_ms") and dns_ttl["cache_ms"] < dns_ttl["reseau_ms"] * 0.3
         ) else RESET
-        print(couleur + t("dns_ttl_cache", v=dns_ttl["cache_ms"]) + RESET)
+        print(couleur + t("dns_ttl_cache", v=_fmt_ms(dns_ttl["cache_ms"])) + RESET)
     if dns_ttl.get("ttl_s") is not None:
         print(t("dns_ttl_valeur", s=dns_ttl["ttl_s"]))
 
@@ -335,8 +339,10 @@ def afficher_analyse_slo(slo_checks):
     for cle, c in slo_checks.items():
         unite  = SLO_UNITES.get(cle, "ms")
         sep    = " " if unite else ""
-        valeur = str(c["valeur"]) + sep + unite
-        seuil  = str(c["seuil"])  + sep + unite
+        v_fmt  = f"{c['valeur']:.1f}" if unite == "ms" else str(c["valeur"])
+        s_fmt  = f"{c['seuil']:.1f}"  if unite == "ms" and isinstance(c["seuil"], float) else str(c["seuil"])
+        valeur = v_fmt + sep + unite
+        seuil  = s_fmt + sep + unite
         op     = c.get("op", "<=")
         statut = (VERT + t("slo_check_ok") + RESET) if c["ok"] else (ROUGE + t("slo_check_nok") + RESET)
         print("  " + cle.ljust(largeur_cle) + valeur.rjust(12) + f"  {op}  " + seuil.ljust(12) + statut)
@@ -361,17 +367,17 @@ def afficher_comparaison_baseline(comparaisons, date):
             statut_str = VERT + t("baseline_amelioration") + RESET
         else:
             statut_str = VERT + t("baseline_stable") + RESET
-        avant_str = (str(c["avant"]) + " ms").rjust(9)
-        apres_str = (str(c["apres"]) + " ms").ljust(9)
+        avant_str = (f"{c['avant']:.1f} ms").rjust(9)
+        apres_str = (f"{c['apres']:.1f} ms").ljust(9)
         print("    " + c["nom"].ljust(10) + ": " + avant_str + " → " + apres_str + "  " + delta_str + "  " + statut_str)
 
 def afficher_http_timing(ttfb_p50, transfert_p50, total_p50):
     if ttfb_p50 is None or transfert_p50 is None:
         return
     print(t("http_timing"))
-    print(t("ttfb",      v=ttfb_p50))
-    print(t("transfert", v=transfert_p50))
-    print(t("total_p50", v=total_p50))
+    print(t("ttfb",      v=_fmt_ms(ttfb_p50)))
+    print(t("transfert", v=_fmt_ms(transfert_p50)))
+    print(t("total_p50", v=_fmt_ms(total_p50)))
 
 def afficher_resultat(r, slo_checks=None, comparaison_baseline=None, verbosity="full"):
     full = verbosity == "full"
@@ -386,20 +392,20 @@ def afficher_resultat(r, slo_checks=None, comparaison_baseline=None, verbosity="
                         s=r.get("co_intervalle_s", "?"),
                         n=r.get("nb_mesures", "?")) + RESET)
     print(t("http_dist", n=r.get("nb_mesures", "?")))
-    print(t("moyenne", v=r["moyenne"], min=r["min"], max=r["max"]))
-    print(t("p50",  v=r["p50"]))
-    print(t("p75",  v=r["p75"]))
-    print(t("p90",  v=r["p90"]))
-    print(t("p95",  v=r["p95"]))
-    print(t("p99",  v=r["p99"]))
-    print(t("p999", v=r["p999"]))
+    print(t("moyenne", v=_fmt_ms(r["moyenne"]), min=_fmt_ms(r["min"]), max=_fmt_ms(r["max"])))
+    print(t("p50",  v=_fmt_ms(r["p50"])))
+    print(t("p75",  v=_fmt_ms(r["p75"])))
+    print(t("p90",  v=_fmt_ms(r["p90"])))
+    print(t("p95",  v=_fmt_ms(r["p95"])))
+    print(t("p99",  v=_fmt_ms(r["p99"])))
+    print(t("p999", v=_fmt_ms(r["p999"])))
     if full:
         afficher_http_timing(r.get("ttfb_p50"), r.get("transfert_p50"), r.get("p50"))
     print(t("stabilite") + indicateur_stabilite(r["p50"], r["p99"]))
     if r.get("ip_mode"):
         print(t("dns_ip_na"))
     else:
-        print(t("dns", v=r["dns_moyenne"], min=r["dns_min"], max=r["dns_max"]))
+        print(t("dns", v=_fmt_ms(r["dns_moyenne"]), min=_fmt_ms(r["dns_min"]), max=_fmt_ms(r["dns_max"])))
         if full:
             afficher_dns_ttl(r.get("dns_ttl"))
 
