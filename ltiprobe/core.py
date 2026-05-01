@@ -46,8 +46,17 @@ _HDR_MAX_US = 60_000_000
 def creer_histogramme():
     return HdrHistogram(_HDR_MIN_US, _HDR_MAX_US, 3)
 
-def hdr_enregistrer(hist, ms):
-    hist.record_value(max(1, int(ms * 1000)))
+def hdr_enregistrer(hist, ms, intervalle_us=None):
+    """Enregistre une mesure en ms dans l'histogramme.
+
+    Si intervalle_us est fourni, applique la correction coordinated omission
+    (Gil Tene) via record_corrected_value() — à utiliser en mode --interval.
+    """
+    valeur_us = max(1, int(ms * 1000))
+    if intervalle_us:
+        hist.record_corrected_value(valeur_us, intervalle_us)
+    else:
+        hist.record_value(valeur_us)
 
 def hdr_stats(hist):
     """Extrait les statistiques clés d'un histogramme en ms."""

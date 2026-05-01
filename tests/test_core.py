@@ -79,6 +79,31 @@ def test_hdr_stats_contient_encode():
     assert "hdr_encode" in s
     assert len(s["hdr_encode"]) > 0
 
+def test_hdr_enregistrer_sans_correction():
+    """Sans intervalle_us, record_value() est utilisé — count == nb insertions."""
+    hist = creer_histogramme()
+    hdr_enregistrer(hist, 100.0)
+    hdr_enregistrer(hist, 200.0)
+    assert hist.get_total_count() == 2
+
+def test_hdr_enregistrer_avec_correction_insere_valeurs_supplementaires():
+    """Avec intervalle_us, une mesure très lente doit générer plus d'une entrée."""
+    hist = creer_histogramme()
+    # intervalle attendu : 1000ms (1_000_000 µs), mesure : 3500ms → doit insérer 3+ valeurs
+    hdr_enregistrer(hist, 3500.0, intervalle_us=1_000_000)
+    assert hist.get_total_count() >= 3
+
+def test_hdr_enregistrer_avec_correction_eleve_p99():
+    """La correction doit produire un p99 plus élevé qu'un enregistrement brut."""
+    hist_brut   = creer_histogramme()
+    hist_corr   = creer_histogramme()
+    intervalle_us = 500_000  # 500ms entre mesures
+    mesures = [200.0, 200.0, 200.0, 200.0, 200.0, 200.0, 200.0, 200.0, 200.0, 3000.0]
+    for ms in mesures:
+        hdr_enregistrer(hist_brut, ms)
+        hdr_enregistrer(hist_corr, ms, intervalle_us=intervalle_us)
+    assert hdr_stats(hist_corr)["p99"] >= hdr_stats(hist_brut)["p99"]
+
 def test_verifier_slo_respect():
     """Un résultat sous les seuils doit tout marquer OK."""
     resultat = {"p50": 100.0, "p95": 200.0, "dns_moyenne": 10.0}
