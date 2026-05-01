@@ -228,8 +228,11 @@ def afficher_reseau(info):
     if info is None:
         print(t("reseau_na"))
         return
-    if info.get("interface"):
-        print(t("reseau_interface", v=info["interface"]))
+    for iface in info.get("interfaces") or []:
+        cle = "reseau_iface_actif" if iface["actif"] else "reseau_iface_autre"
+        couleur = VERT if iface["actif"] else ""
+        ligne = t(cle, device=iface["device"], type=iface["type"])
+        print(couleur + ligne + (RESET if couleur else ""))
     if info.get("local_ip"):
         print(t("reseau_local_ip",  v=info["local_ip"]))
     if info.get("public_ip"):

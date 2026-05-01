@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pytest
-from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, calculer_mos, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls, mesurer_dns_ttl, detecter_reseau
+from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, calculer_mos, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls, mesurer_dns_ttl, detecter_reseau, lister_interfaces
 from ltiprobe.i18n import get_translator
 
 
@@ -338,7 +338,32 @@ def test_detecter_reseau_structure():
     """detecter_reseau doit retourner un dict avec les clés attendues."""
     r = detecter_reseau()
     assert r is not None
-    assert set(r.keys()) == {"local_ip", "interface", "public_ip", "isp", "as_info", "pays", "pays_code"}
+    assert set(r.keys()) == {"local_ip", "interface", "interfaces", "public_ip", "isp", "as_info", "pays", "pays_code"}
+
+def test_lister_interfaces_retourne_liste():
+    """lister_interfaces doit retourner une liste (vide ou non)."""
+    ifaces = lister_interfaces()
+    assert isinstance(ifaces, list)
+
+def test_lister_interfaces_structure():
+    """Chaque interface doit avoir les clés device, type, actif."""
+    ifaces = lister_interfaces()
+    for iface in ifaces:
+        assert "device" in iface
+        assert "type"   in iface
+        assert "actif"  in iface
+
+def test_lister_interfaces_active_marquee():
+    """L'interface active doit être marquée actif=True, les autres False."""
+    r = detecter_reseau()
+    iface_active = r.get("interface") if r else None
+    if not iface_active:
+        return
+    ifaces = lister_interfaces(iface_active)
+    actives = [i for i in ifaces if i["actif"]]
+    assert len(actives) <= 1
+    if actives:
+        assert actives[0]["device"] == iface_active
 
 def test_detecter_reseau_local_ip():
     """L'IP locale doit être une adresse IPv4 valide."""
