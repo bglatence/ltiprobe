@@ -493,6 +493,50 @@ def mesurer_dns(hostname):
     except socket.gaierror:
         return None
 
+def mesurer_dns_ttl(hostname, timeout=5):
+    """Mesure le comportement du cache DNS et lit le TTL de l'enregistrement A.
+
+    Effectue deux résolutions :
+      1. Via dnspython sans cache (toujours réseau) → latence réseau + TTL du serveur
+      2. Via socket.getaddrinfo() en double appel → latence cache OS (2e appel)
+
+    Retourne un dict {reseau_ms, cache_ms, ttl_s} ou None si les deux échouent.
+    """
+    import dns.resolver as _resolver
+
+    reseau_ms = None
+    ttl_s     = None
+    cache_ms  = None
+
+    # Résolution réseau directe — bypass le cache OS, toujours un aller-retour DNS
+    try:
+        r = _resolver.Resolver()
+        r.cache = None
+        debut   = time.perf_counter()
+        answer  = r.resolve(hostname, "A", lifetime=timeout)
+        reseau_ms = round((time.perf_counter() - debut) * 1000, 2)
+        ttl_s     = answer.rrset.ttl
+    except Exception:
+        pass
+
+    # Cache OS — premier appel pour peupler, second appel pour mesurer le cache
+    try:
+        socket.getaddrinfo(hostname, None)
+        debut    = time.perf_counter()
+        socket.getaddrinfo(hostname, None)
+        cache_ms = round((time.perf_counter() - debut) * 1000, 2)
+    except Exception:
+        pass
+
+    if reseau_ms is None and cache_ms is None:
+        return None
+
+    return {
+        "reseau_ms": reseau_ms,
+        "cache_ms":  cache_ms,
+        "ttl_s":     ttl_s,
+    }
+
 def extraire_hostname(url):
     """Extrait le hostname d'une URL, même si le schéma est malformé (https// vs https://)."""
     if "//" in url:
