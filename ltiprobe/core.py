@@ -96,6 +96,11 @@ _SLO_VERS_RESULTAT = {
 # Clés SLO où une valeur plus haute est meilleure (seuil = valeur minimale)
 _SLO_MIN_KEYS: set[str] = {"mos_min"}
 
+# Plages valides pour certaines clés SLO (min_inclusif, max_inclusif)
+_SLO_PLAGES: dict[str, tuple] = {
+    "mos_min": (1.0, 4.5),
+}
+
 # Unité d'affichage par clé SLO (défaut : "ms")
 SLO_UNITES: dict[str, str] = {
     "stabilite_ratio": "x",
@@ -237,12 +242,21 @@ def verifier_slo(resultat, slo):
 
     Retourne un dict {cle_slo: {seuil, valeur, ok, op}} pour chaque clé du SLO.
     Les clés dans _SLO_MIN_KEYS utilisent >= (valeur plus haute = meilleure).
+    Lève ValueError si un seuil est hors de la plage définie dans _SLO_PLAGES.
     """
     checks = {}
     for cle_slo, seuil in slo.items():
         cle_res = _SLO_VERS_RESULTAT.get(cle_slo)
         if cle_res is None:
             continue
+        plage = _SLO_PLAGES.get(cle_slo)
+        if plage is not None:
+            borne_min, borne_max = plage
+            if not (borne_min <= seuil <= borne_max):
+                raise ValueError(
+                    f"Seuil SLO invalide pour '{cle_slo}' : {seuil} "
+                    f"(valeur attendue entre {borne_min} et {borne_max})"
+                )
         valeur = resultat.get(cle_res)
         if valeur is None:
             continue

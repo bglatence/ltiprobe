@@ -541,7 +541,11 @@ def _mesurer_site(site_cfg, args, verify_tls):
                                icmp["loss_pct"] if icmp else 0.0,
                            )["mos"] if icmp else None,
     }
-    slo_checks    = verifier_slo(resultat_final, slo) if slo else None
+    try:
+        slo_checks = verifier_slo(resultat_final, slo) if slo else None
+    except ValueError as e:
+        print(ROUGE + "Erreur SLO : " + str(e) + RESET, file=sys.stderr)
+        sys.exit(1)
     assert_checks = verifier_assertions(site, asserts, timeout=args.timeout) if asserts else None
     resultat_final["slo_checks"]    = slo_checks
     resultat_final["assert_checks"] = assert_checks

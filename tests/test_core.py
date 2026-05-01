@@ -257,6 +257,27 @@ def test_verifier_slo_mos_min_violation():
     assert checks["mos_min"]["op"] == ">="
 
 
+def test_verifier_slo_mos_min_seuil_invalide_trop_haut():
+    """mos_min > 4.5 doit lever ValueError."""
+    import pytest
+    with pytest.raises(ValueError, match="mos_min"):
+        verifier_slo({"mos": 4.0}, {"mos_min": 5.0})
+
+
+def test_verifier_slo_mos_min_seuil_invalide_trop_bas():
+    """mos_min < 1.0 doit lever ValueError."""
+    import pytest
+    with pytest.raises(ValueError, match="mos_min"):
+        verifier_slo({"mos": 4.0}, {"mos_min": 0.5})
+
+
+def test_verifier_slo_mos_min_bornes_valides():
+    """Les bornes exactes 1.0 et 4.5 doivent être acceptées."""
+    resultat = {"mos": 3.0}
+    assert verifier_slo(resultat, {"mos_min": 1.0})["mos_min"]["seuil"] == 1.0
+    assert verifier_slo(resultat, {"mos_min": 4.5})["mos_min"]["seuil"] == 4.5
+
+
 def test_verifier_slo_op_field_standard():
     """Les clés SLO standards doivent avoir op='<='."""
     resultat = {"p50": 100.0, "dns_moyenne": 30.0}
