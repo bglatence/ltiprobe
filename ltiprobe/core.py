@@ -567,6 +567,48 @@ def mesurer_site(url, nb_mesures=None, timeout=None, verify_tls=True):
         "transfert_ms": round(sum(transfert_mesures) / len(transfert_mesures), 2) if transfert_mesures else None,
     }
 
+def calculer_mos(latence_ms, jitter_ms=0.0, loss_pct=0.0):
+    """Calcule le MOS selon l'ITU-T G.107 E-Model (codec G.711 comme référence).
+
+    Entrées :
+      latence_ms : float — latence moyenne aller-retour ICMP en ms
+      jitter_ms  : float — jitter (StDev des RTT) en ms
+      loss_pct   : float — taux de perte en % (0–100)
+
+    Retourne un dict {r_factor, mos, qualite}.
+    qualite : "excellente" | "bonne" | "acceptable" | "mediocre" | "mauvaise"
+    """
+    # Délai effectif : latence + estimation du jitter buffer (2× jitter)
+    delay = latence_ms + (jitter_ms or 0.0) * 2.0
+
+    # Id — dégradation due au délai (G.107 §B.3)
+    h = 1 if delay > 177.3 else 0
+    id_ = 0.024 * delay + 0.11 * (delay - 177.3) * h
+
+    # Ie — dégradation due aux pertes (G.711 : Bpl = 25)
+    loss = (loss_pct or 0.0) / 100.0
+    ie = 7.0 + 30.0 * math.log(1.0 + 15.0 * loss) if loss > 0 else 0.0
+
+    # R-factor (plafonné 0–100)
+    r = max(0.0, min(100.0, 93.2 - id_ - ie))
+
+    # R → MOS (G.107 §B.4)
+    mos = 1.0 + 0.035 * r + r * (r - 60) * (100 - r) * 7e-6
+    mos = round(max(1.0, min(4.5, mos)), 2)
+
+    if mos >= 4.3:
+        qualite = "excellente"
+    elif mos >= 4.0:
+        qualite = "bonne"
+    elif mos >= 3.6:
+        qualite = "acceptable"
+    elif mos >= 3.1:
+        qualite = "mediocre"
+    else:
+        qualite = "mauvaise"
+
+    return {"r_factor": round(r, 1), "mos": mos, "qualite": qualite}
+
 def envoyer_webhook(webhook_url, payload, timeout=5):
     """Envoie un payload JSON vers un endpoint HTTP POST (webhook).
 
