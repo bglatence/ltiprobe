@@ -100,7 +100,7 @@ ltiprobe --help
 ## Sample output
 
 ```
-ltiprobe (0.8.0):
+ltiprobe (1.0.0):
 
 * measuring response times of web sites (10 attempts)
 * using config file: ltiprobe.yaml
@@ -122,11 +122,16 @@ https://google.com
   DNS   -> average: 8.2 ms  min: 6.1  max: 11.4
 
   --- Protocol comparison (cold connection) ---
-  ICMP  (network)         :  12.3 ms  min: 11.1  max: 13.5  (10 packets)
-  TCP   (port 443)        :  18.7 ms  min: 17.2  max: 21.0  (+6.4 ms)
-  TLS   (handshake, ×1)   :  31.2 ms  min: 28.4  max: 35.1  (+12.5 ms)
+  ICMP  (network)         :  12.3 ms  min: 11.1  max: 13.5  jitter: 1.2 ms  loss: 0%  (10 packets)
+  TCP   (port 443)        :  18.7 ms  min: 17.2  max: 21.0  jitter: 0.8 ms  (+6.4 ms)
+  TLS   (handshake, ×1)   :  31.2 ms  min: 28.4  max: 35.1  jitter: 1.5 ms  (+12.5 ms)
   HTTP  (p50, cold)       :  38.0 ms  (+6.8 ms)
   HTTP  (p50, keep-alive) :  19.3 ms  ← no TCP/TLS
+
+  ── Scoring Standards ────────────────────────────────
+  ITU-T G.107 (E-Model)
+    R-factor  : 88.1 / 100
+    MOS       :  4.3 / 4.5  ✓  excellent
 
   ── Cache / CDN ──────────────────────────────────────
   Cache  →  HIT  Cloudflare  PoP: YYZ  Age: 42s
@@ -234,6 +239,53 @@ ltiprobe measures all layers in parallel and shows deltas:
 | HTTP keep-alive | Estimated without TCP/TLS — represents server processing + transfer |
 
 > **Note:** Comparison is done on a *cold connection*. In production with HTTP keep-alive or HTTP/2, only the keep-alive HTTP cost applies per request.
+
+## Jitter and packet loss
+
+ltiprobe reports jitter and packet loss for each protocol layer:
+
+| Metric | Description |
+|---|---|
+| **Jitter** | Standard deviation of round-trip times — reflects latency consistency |
+| **Packet loss** | Percentage of ICMP packets lost — displayed in green (0%) or orange (> 0%) |
+
+Jitter is available on ICMP, TCP and TLS. Packet loss is available on ICMP only (TCP handles retransmission transparently).
+
+New SLO keys: `icmp_jitter_ms`, `icmp_loss_pct`, `tcp_jitter_ms`.
+
+## Scoring Standards
+
+ltiprobe includes a **Scoring Standards** section that applies industry-standard quality models
+to the measured network metrics. It appears automatically when ICMP data is available.
+
+### ITU-T G.107 (E-Model)
+
+The E-Model is the ITU-T standard for estimating voice and real-time communication quality
+from three network metrics: latency, jitter, and packet loss.
+
+**Inputs** (all already measured by ltiprobe):
+
+| Input | Source |
+|---|---|
+| Latency | ICMP mean RTT |
+| Jitter | ICMP RTT standard deviation |
+| Packet loss | ICMP loss % |
+
+**Output**:
+
+- **R-factor** (0–100): raw quality score — higher is better
+- **MOS** (1.0–4.5): Mean Opinion Score — perceptual quality as experienced by end users
+
+| MOS | R-factor | Quality | User experience |
+|---|---|---|---|
+| ≥ 4.3 | ≥ 90 | Excellent | Indistinguishable from face-to-face |
+| ≥ 4.0 | ≥ 80 | Good | Minor imperceptible imperfections |
+| ≥ 3.6 | ≥ 70 | Acceptable | Noticeable but tolerable |
+| ≥ 3.1 | ≥ 60 | Poor | Significant effort required |
+| < 3.1 | < 60 | Bad | Communication breakdown |
+
+> **Reference codec**: G.711 (standard telephone quality, widely used for VoIP).
+> The section is designed to accommodate additional standards (G.1051, QoE models) in future releases.
 
 ## Stability indicator
 
@@ -545,6 +597,35 @@ webhook:
 ```
 
 Envoi non-bloquant (thread daemon). Compatible Slack, Teams, PagerDuty, Discord et tout endpoint HTTP.
+
+### Jitter et packet loss
+
+ltiprobe rapporte le jitter et le packet loss pour chaque couche protocolaire :
+
+- **Jitter** : écart-type des RTT — mesure la consistance de la latence (ICMP, TCP, TLS)
+- **Packet loss** : % de paquets perdus — affiché en vert (0%) ou orange (> 0%) — ICMP uniquement
+
+Nouvelles clés SLO : `icmp_jitter_ms`, `icmp_loss_pct`, `tcp_jitter_ms`.
+
+### Scoring Standards
+
+Quand les données ICMP sont disponibles, ltiprobe affiche une section **Scoring Standards**
+appliquant des modèles de qualité normalisés aux métriques mesurées.
+
+#### ITU-T G.107 (E-Model)
+
+Norme ITU-T d'estimation de la qualité vocale et temps-réel à partir de la latence, du jitter
+et du taux de perte. Zéro mesure réseau supplémentaire — tout est calculé depuis l'ICMP.
+
+| MOS | Qualité | Ressenti |
+|---|---|---|
+| ≥ 4.3 | Excellente | Comme en face-à-face |
+| ≥ 4.0 | Bonne | Imperceptible |
+| ≥ 3.6 | Acceptable | Tolerable |
+| ≥ 3.1 | Médiocre | Effort notable |
+| < 3.1 | Mauvaise | Incompréhension |
+
+> Codec de référence : G.711. La section est extensible pour accueillir G.1051 ou d'autres normes QoE.
 
 ### Licence
 
