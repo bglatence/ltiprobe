@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pytest
-from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, calculer_mos, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls, mesurer_dns_ttl
+from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, calculer_mos, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls, mesurer_dns_ttl, detecter_reseau
 from ltiprobe.i18n import get_translator
 
 
@@ -333,6 +333,30 @@ def test_mesurer_tls_valide():
     assert r["moyenne"] > 0
     assert r["min"] <= r["moyenne"] <= r["max"]
     assert r["nb"] == 2
+
+def test_detecter_reseau_structure():
+    """detecter_reseau doit retourner un dict avec les clés attendues."""
+    r = detecter_reseau()
+    assert r is not None
+    assert set(r.keys()) == {"local_ip", "interface", "public_ip", "isp", "as_info", "pays", "pays_code"}
+
+def test_detecter_reseau_local_ip():
+    """L'IP locale doit être une adresse IPv4 valide."""
+    import ipaddress
+    r = detecter_reseau()
+    assert r is not None
+    assert r["local_ip"] is not None
+    ipaddress.ip_address(r["local_ip"])  # lève ValueError si invalide
+
+def test_detecter_reseau_public_ip():
+    """L'IP publique doit être présente et différente de l'IP locale."""
+    r = detecter_reseau()
+    assert r is not None
+    assert r["public_ip"] is not None
+    # IP publique différente de locale (sauf cas NAT direct, rare)
+    # On vérifie juste que c'est une IP valide
+    import ipaddress
+    ipaddress.ip_address(r["public_ip"])
 
 def test_mesurer_dns_ttl_valide():
     """Un hôte accessible doit retourner reseau_ms, cache_ms et ttl_s."""

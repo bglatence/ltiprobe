@@ -14,7 +14,7 @@ from ltiprobe.core import (
     mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute, inspecter_tls,
     detecter_cdn, est_adresse_ip, verifier_ip_joignable,
     charger_baseline, comparer_baseline, sauvegarder_csv_comparaison,
-    calculer_mos, mesurer_dns_ttl, SLO_UNITES, _SEUIL_EXPIRY_ALERTE,
+    calculer_mos, mesurer_dns_ttl, detecter_reseau, SLO_UNITES, _SEUIL_EXPIRY_ALERTE,
 )
 
 # Codes ANSI — désactivés si la sortie n'est pas un terminal (fichier, CI)
@@ -222,6 +222,24 @@ def afficher_cdn(cdn_info):
         print(t("cdn_aucun"))
     else:
         print(t("cdn_ligne", statut=statut, cdn=cdn_nom, suite=suite))
+
+def afficher_reseau(info):
+    print(t("reseau_titre"))
+    if info is None:
+        print(t("reseau_na"))
+        return
+    if info.get("interface"):
+        print(t("reseau_interface", v=info["interface"]))
+    if info.get("local_ip"):
+        print(t("reseau_local_ip",  v=info["local_ip"]))
+    if info.get("public_ip"):
+        print(t("reseau_public_ip", v=info["public_ip"]))
+    if info.get("isp"):
+        print(t("reseau_isp",       v=info["isp"]))
+    if info.get("as_info"):
+        print(t("reseau_as",        v=info["as_info"]))
+    if info.get("pays") and info.get("pays_code"):
+        print(t("reseau_pays",      v=info["pays"], code=info["pays_code"]))
 
 def afficher_dns_ttl(dns_ttl):
     if dns_ttl is None:
@@ -647,6 +665,10 @@ def main():
 
     cfg_file = args.config_file or config.FICHIER_DEFAUT
     print(t("header", ver=__version__, n=args.nombre, cfg=cfg_file) + "\n")
+
+    reseau_info = detecter_reseau()
+    afficher_reseau(reseau_info)
+    print("")
 
     webhook_cfg = cfg.get("webhook")  # {url, on} ou None si absent du YAML
 
