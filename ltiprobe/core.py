@@ -99,7 +99,7 @@ _SLO_VERS_RESULTAT = {
     "tcp_jitter_ms":   "tcp_jitter_ms",
     "tls_ms":          "tls_ms",
     "mos_min":         "mos",
-    "http_chaud_ms":   "http_chaud_ms",
+    "http_keepalive_ms": "http_keepalive_ms",
     "nb_hops_max":     "nb_hops",
 }
 

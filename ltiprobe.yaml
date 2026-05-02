@@ -43,7 +43,7 @@ verbosity: full
 #   tcp_ms          — average TCP handshake latency
 #   tcp_jitter_ms   — TCP jitter (standard deviation of RTTs)
 #   tls_ms          — average TLS handshake latency
-#   http_chaud_ms   — estimated keep-alive HTTP latency (no TCP/TLS overhead)
+#   http_keepalive_ms   — estimated keep-alive HTTP latency (no TCP/TLS overhead)
 #   nb_hops_max     — maximum hop count (requires --traceroute)
 #   mos_min         — minimum ITU-T G.107 MOS score (higher = better, e.g. 3.6)
 #

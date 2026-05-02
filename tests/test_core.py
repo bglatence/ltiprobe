@@ -156,12 +156,12 @@ def test_verifier_slo_stability_ratio():
     assert not checks2["stability_ratio"]["ok"]
 
 def test_verifier_slo_nouvelles_cles():
-    """icmp_ms, tcp_ms, tls_ms et http_chaud_ms doivent être vérifiables."""
+    """icmp_ms, tcp_ms, tls_ms et http_keepalive_ms doivent être vérifiables."""
     resultat = {
         "icmp_ms": 12.0, "tcp_ms": 18.0,
-        "tls_ms": 45.0, "http_chaud_ms": 70.0,
+        "tls_ms": 45.0, "http_keepalive_ms": 70.0,
     }
-    slo = {"icmp_ms": 20, "tcp_ms": 30, "tls_ms": 50, "http_chaud_ms": 100}
+    slo = {"icmp_ms": 20, "tcp_ms": 30, "tls_ms": 50, "http_keepalive_ms": 100}
     checks = verifier_slo(resultat, slo)
     assert all(c["ok"] for c in checks.values())
 
@@ -198,10 +198,10 @@ def test_config_yaml(tmp_path):
 
 _CLES_SLO_VALIDES = {
     "http_p50_ms", "http_p75_ms", "http_p90_ms",
-    "http_p95_ms", "http_p99_ms", "http_p999_ms", "dns_ms",
-    "stability_ratio", "icmp_ms", "icmp_jitter_ms", "icmp_loss_pct",
+    "http_p95_ms", "http_p99_ms", "http_p999_ms", "http_max_ms",
+    "dns_ms", "stability_ratio", "icmp_ms", "icmp_jitter_ms", "icmp_loss_pct",
     "tcp_ms", "tcp_jitter_ms", "tls_ms",
-    "http_chaud_ms", "nb_hops_max", "mos_min",
+    "http_keepalive_ms", "nb_hops_max", "mos_min",
 }
 
 def test_ltiprobe_yaml_existe():
@@ -960,7 +960,7 @@ def test_verifier_slo_http_max_ms_ok():
                 "dns_moyenne": 5.0, "stability_ratio": 3.0,
                 "icmp_ms": None, "icmp_jitter_ms": None, "icmp_loss_pct": None,
                 "tcp_ms": None, "tcp_jitter_ms": None, "tls_ms": None,
-                "mos": None, "http_chaud_ms": None, "nb_hops": None,
+                "mos": None, "http_keepalive_ms": None, "nb_hops": None,
                 "p75": 50.0, "p90": 70.0, "p95": 75.0, "p999": 120.0}
     slo = {"http_max_ms": 200}
     checks = verifier_slo(resultat, slo)
@@ -973,7 +973,7 @@ def test_verifier_slo_http_max_ms_violation():
                 "dns_moyenne": 5.0, "stability_ratio": 3.0,
                 "icmp_ms": None, "icmp_jitter_ms": None, "icmp_loss_pct": None,
                 "tcp_ms": None, "tcp_jitter_ms": None, "tls_ms": None,
-                "mos": None, "http_chaud_ms": None, "nb_hops": None,
+                "mos": None, "http_keepalive_ms": None, "nb_hops": None,
                 "p75": 50.0, "p90": 70.0, "p95": 75.0, "p999": 120.0}
     slo = {"http_max_ms": 200}
     checks = verifier_slo(resultat, slo)

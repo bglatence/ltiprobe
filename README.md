@@ -214,7 +214,7 @@ sites:
       tls_ms: 80            # max TLS handshake
       icmp_ms: 30           # max network (ICMP) latency
       tcp_ms: 40            # max TCP handshake
-      http_chaud_ms: 150    # max keep-alive HTTP (no TCP/TLS)
+      http_keepalive_ms: 150    # max keep-alive HTTP (no TCP/TLS)
       stability_ratio: 5    # max P99/P50 ratio
       nb_hops_max: 25       # max network hops (--traceroute)
       mos_min: 3.6          # min MOS score 1.0–4.5 (ITU-T G.107)
@@ -247,7 +247,7 @@ If the file is absent, ltiprobe starts with default sites and values.
 | `icmp_loss_pct` | ICMP packet loss percentage |
 | `tcp_ms` | TCP handshake duration |
 | `tcp_jitter_ms` | TCP jitter |
-| `http_chaud_ms` | Estimated keep-alive HTTP (no TCP/TLS) |
+| `http_keepalive_ms` | Estimated keep-alive HTTP (no TCP/TLS) |
 | `stability_ratio` | P99/P50 ratio (e.g. `5` means P99 ≤ 5× P50) |
 | `nb_hops_max` | Max network hops (requires `--traceroute`) |
 | `mos_min` | Minimum MOS score 1.0–4.5 — inverted check: fails if MOS **below** threshold |
@@ -680,7 +680,7 @@ webhook:
 | `icmp_loss_pct` | Taux de perte ICMP |
 | `tcp_ms` | Durée du handshake TCP |
 | `tcp_jitter_ms` | Jitter TCP |
-| `http_chaud_ms` | HTTP keep-alive estimé (sans TCP/TLS) |
+| `http_keepalive_ms` | HTTP keep-alive estimé (sans TCP/TLS) |
 | `stability_ratio` | Ratio P99/P50 |
 | `nb_hops_max` | Hops réseau max (requiert `--traceroute`) |
 | `mos_min` | Score MOS minimum 1.0–4.5 — violation si MOS **en dessous** du seuil |

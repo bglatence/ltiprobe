@@ -200,9 +200,9 @@ def afficher_protocoles(icmp, tcp, tls, http_p50, site):
         prev = tls_moy or tcp_moy or icmp_moy
         print(t("proto_http_froid", v=_fmt_ms(http_p50)) + _delta(prev, http_p50))
         surcharge = round((tcp_moy or 0) + (tls_moy or 0), 1)
-        http_chaud = round(http_p50 - surcharge, 1)
-        if surcharge > 0 and http_chaud > 0:
-            print(t("proto_http_chaud", v=_fmt_ms(http_chaud)))
+        http_keepalive = round(http_p50 - surcharge, 1)
+        if surcharge > 0 and http_keepalive > 0:
+            print(t("proto_http_keepalive", v=_fmt_ms(http_keepalive)))
 
 def afficher_traceroute(tr):
     if tr is None:
@@ -735,7 +735,7 @@ def _mesurer_site(site_cfg, args, verify_tls):
     tcp_moy    = tcp["moyenne"] if tcp else None
     tls_moy    = tls["moyenne"] if tls else None
     surcharge  = round((tcp_moy or 0) + (tls_moy or 0), 1)
-    http_chaud = round(p50 - surcharge, 1) if surcharge > 0 and p50 > surcharge else None
+    http_keepalive = round(p50 - surcharge, 1) if surcharge > 0 and p50 > surcharge else None
 
     resultat_final = {
         "url":         site,
@@ -762,7 +762,7 @@ def _mesurer_site(site_cfg, args, verify_tls):
         "tcp_ms":          tcp_moy,
         "tcp_jitter_ms":   tcp["jitter"] if tcp else None,
         "tls_ms":          tls_moy,
-        "http_chaud_ms":   http_chaud,
+        "http_keepalive_ms":   http_keepalive,
         "nb_hops":         traceroute["nb_hops"] if traceroute else None,
         "tls_info":        tls_info_result.get("tls_info") if args.tls_info and is_https else None,
         "mos":             calculer_mos(
