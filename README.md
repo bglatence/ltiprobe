@@ -215,7 +215,7 @@ sites:
       icmp_ms: 30           # max network (ICMP) latency
       tcp_ms: 40            # max TCP handshake
       http_chaud_ms: 150    # max keep-alive HTTP (no TCP/TLS)
-      stabilite_ratio: 5    # max P99/P50 ratio
+      stability_ratio: 5    # max P99/P50 ratio
       nb_hops_max: 25       # max network hops (--traceroute)
       mos_min: 3.6          # min MOS score 1.0–4.5 (ITU-T G.107)
     assert:
@@ -248,7 +248,7 @@ If the file is absent, ltiprobe starts with default sites and values.
 | `tcp_ms` | TCP handshake duration |
 | `tcp_jitter_ms` | TCP jitter |
 | `http_chaud_ms` | Estimated keep-alive HTTP (no TCP/TLS) |
-| `stabilite_ratio` | P99/P50 ratio (e.g. `5` means P99 ≤ 5× P50) |
+| `stability_ratio` | P99/P50 ratio (e.g. `5` means P99 ≤ 5× P50) |
 | `nb_hops_max` | Max network hops (requires `--traceroute`) |
 | `mos_min` | Minimum MOS score 1.0–4.5 — inverted check: fails if MOS **below** threshold |
 
@@ -531,7 +531,7 @@ Exported metrics:
 | `ltiprobe_icmp_ms` | ICMP mean RTT |
 | `ltiprobe_tcp_ms` | TCP handshake mean |
 | `ltiprobe_tls_ms` | TLS handshake mean |
-| `ltiprobe_stabilite_ratio` | P99/P50 stability ratio |
+| `ltiprobe_stability_ratio` | P99/P50 stability ratio |
 | `ltiprobe_slo_ok` | SLO check result — `1.0` = met, `0.0` = violated (labels: `url`, `slo`) |
 
 ## Webhook alerting
@@ -681,7 +681,7 @@ webhook:
 | `tcp_ms` | Durée du handshake TCP |
 | `tcp_jitter_ms` | Jitter TCP |
 | `http_chaud_ms` | HTTP keep-alive estimé (sans TCP/TLS) |
-| `stabilite_ratio` | Ratio P99/P50 |
+| `stability_ratio` | Ratio P99/P50 |
 | `nb_hops_max` | Hops réseau max (requiert `--traceroute`) |
 | `mos_min` | Score MOS minimum 1.0–4.5 — violation si MOS **en dessous** du seuil |
 

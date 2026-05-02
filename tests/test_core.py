@@ -145,13 +145,13 @@ def test_verifier_slo_violation():
     assert checks["http_p95_ms"]["ok"]
     assert checks["dns_ms"]["ok"]
 
-def test_verifier_slo_stabilite_ratio():
-    """stabilite_ratio doit vérifier p99/p50 par rapport au seuil."""
-    resultat = {"p50": 100.0, "p99": 200.0, "stabilite_ratio": 2.0}
-    checks = verifier_slo(resultat, {"stabilite_ratio": 3.0})
-    assert checks["stabilite_ratio"]["ok"]
-    checks2 = verifier_slo(resultat, {"stabilite_ratio": 1.5})
-    assert not checks2["stabilite_ratio"]["ok"]
+def test_verifier_slo_stability_ratio():
+    """stability_ratio doit vérifier p99/p50 par rapport au seuil."""
+    resultat = {"p50": 100.0, "p99": 200.0, "stability_ratio": 2.0}
+    checks = verifier_slo(resultat, {"stability_ratio": 3.0})
+    assert checks["stability_ratio"]["ok"]
+    checks2 = verifier_slo(resultat, {"stability_ratio": 1.5})
+    assert not checks2["stability_ratio"]["ok"]
 
 def test_verifier_slo_nouvelles_cles():
     """icmp_ms, tcp_ms, tls_ms et http_chaud_ms doivent être vérifiables."""
@@ -197,7 +197,7 @@ def test_config_yaml(tmp_path):
 _CLES_SLO_VALIDES = {
     "http_p50_ms", "http_p75_ms", "http_p90_ms",
     "http_p95_ms", "http_p99_ms", "http_p999_ms", "dns_ms",
-    "stabilite_ratio", "icmp_ms", "icmp_jitter_ms", "icmp_loss_pct",
+    "stability_ratio", "icmp_ms", "icmp_jitter_ms", "icmp_loss_pct",
     "tcp_ms", "tcp_jitter_ms", "tls_ms",
     "http_chaud_ms", "nb_hops_max", "mos_min",
 }
@@ -714,7 +714,7 @@ def test_sauvegarder_prometheus(tmp_path):
         "icmp_ms": 12.0,
         "tcp_ms": 18.0,
         "tls_ms": 35.0,
-        "stabilite_ratio": 1.5,
+        "stability_ratio": 1.5,
         "slo_checks": {
             "http_p50_ms": {"seuil": 100, "valeur": 42.0, "ok": True},
         },

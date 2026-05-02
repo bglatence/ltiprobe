@@ -90,7 +90,7 @@ _SLO_VERS_RESULTAT = {
     "http_p99_ms":     "p99",
     "http_p999_ms":    "p999",
     "dns_ms":          "dns_moyenne",
-    "stabilite_ratio": "stabilite_ratio",
+    "stability_ratio": "stability_ratio",
     "icmp_ms":         "icmp_ms",
     "icmp_jitter_ms":  "icmp_jitter_ms",
     "icmp_loss_pct":   "icmp_loss_pct",
@@ -107,7 +107,7 @@ _SLO_MIN_KEYS: set[str] = {"mos_min"}
 
 # Unité d'affichage par clé SLO (défaut : "ms")
 SLO_UNITES: dict[str, str] = {
-    "stabilite_ratio": "x",
+    "stability_ratio": "x",
     "nb_hops_max":     "hops",
     "mos_min":         "",
 }
@@ -1133,7 +1133,7 @@ _PROMETHEUS_METRIQUES = [
     ("ltiprobe_icmp_ms",          "icmp_ms",        "ICMP round-trip time mean in milliseconds"),
     ("ltiprobe_tcp_ms",           "tcp_ms",         "TCP handshake time mean in milliseconds"),
     ("ltiprobe_tls_ms",           "tls_ms",         "TLS handshake time mean in milliseconds"),
-    ("ltiprobe_stabilite_ratio",  "stabilite_ratio","Stability ratio p99/p50"),
+    ("ltiprobe_stability_ratio",  "stability_ratio","Stability ratio p99/p50"),
 ]
 
 def _prom_label(valeur):

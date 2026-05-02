@@ -682,7 +682,7 @@ def _mesurer_site(site_cfg, args, verify_tls):
         "tls":             tls,
         "traceroute":      traceroute,
         "cdn_info":        cdn_info,
-        "stabilite_ratio": round(p99 / p50, 2) if p50 > 0 else None,
+        "stability_ratio": round(p99 / p50, 2) if p50 > 0 else None,
         "icmp_ms":         icmp["moyenne"] if icmp else None,
         "icmp_jitter_ms":  icmp["jitter"]   if icmp else None,
         "icmp_loss_pct":   icmp["loss_pct"] if icmp else None,

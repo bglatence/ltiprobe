@@ -26,7 +26,7 @@ verbosity: full
 #   http_p99_ms     — latence HTTP P99
 #   http_p999_ms    — latence HTTP P99.9
 #   dns_ms          — latence DNS moyenne
-#   stabilite_ratio — ratio p99/p50 (ex: 1.5 signifie p99 <= 1.5x p50)
+#   stability_ratio — ratio p99/p50 (ex: 1.5 signifie p99 <= 1.5x p50)
 #   icmp_ms         — latence ICMP (réseau) moyenne
 #   icmp_jitter_ms  — jitter ICMP (écart-type des RTT)
 #   icmp_loss_pct   — taux de perte ICMP en % (ex: 5 = max 5% de perte)
@@ -47,7 +47,7 @@ sites:
       http_p50_ms: 300
       http_p95_ms: 400
       dns_ms: 50
-      stabilite_ratio: 5
+      stability_ratio: 5
       tls_ms: 80
     assert:
       status_code: 200
