@@ -858,8 +858,8 @@ def main():
     print(t("mesures_titre"))
 
     webhook_cfg       = cfg.get("webhook")
-    nb_ressources     = cfg.get("nb_ressources_par_page") or None
-    req_par_heure     = cfg.get("requetes_par_heure") or None
+    nb_ressources     = cfg.get("resources_per_page") or None
+    req_par_heure     = cfg.get("requests_per_hour") or None
 
     tous_resultats    = []
     prev_results      = {}  # {url: resultat} — dernier résultat réussi par site

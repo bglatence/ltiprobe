@@ -311,7 +311,7 @@ Une page web typique charge 30 à 100 ressources. Avec 42 requêtes parallèles,
 qu'un utilisateur subisse au moins une réponse au-delà du P99 est quasi certaine. La formule
 est simple : `P(au moins 1 > seuil) = 1 - (1 - p_dépassement)^N`.
 
-Ajout envisagé : paramètre `nb_ressources_par_page` dans `ltiprobe.yaml`, avec affichage
+Ajout envisagé : paramètre `resources_per_page` dans `ltiprobe.yaml`, avec affichage
 `P(≥1 requête > 200ms sur 40 ressources) = 86%` — traduction directe de la latence réseau
 en ressenti utilisateur concret.
 
@@ -325,7 +325,7 @@ Afficher uniquement des ratios (P99 = 1 %) donne une fausse impression de raret�
 une expérience dégradée. Gil Tene souligne que le médian est "le nombre dont 99,999…% des
 pages vues peuvent être pires".
 
-Ajout envisagé : paramètre `requetes_par_heure` dans `ltiprobe.yaml`, avec affichage
+Ajout envisagé : paramètre `requests_per_hour` dans `ltiprobe.yaml`, avec affichage
 `P99 → ~100 utilisateurs/heure affectés` en regard de chaque percentile SLO.
 
 ---

@@ -9,8 +9,8 @@ _DEFAULTS = {
     "timeout":              10,
     "langue":               "FR",
     "verbosity":            "full",
-    "nb_ressources_par_page": None,  # Q : estimateur compound latency
-    "requetes_par_heure":   None,    # R : traduction percentiles → users/h
+    "resources_per_page":   None,  # Q : compound latency estimator
+    "requests_per_hour":    None,  # R : percentiles → users/h
     "sites": [
         {"url": "https://google.com"},
         {"url": "https://github.com"},

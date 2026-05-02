@@ -17,13 +17,13 @@ langue: EN
 verbosity: full
 
 # User impact analysis (optional)
-#   nb_ressources_par_page — Q: compound latency estimator
+#   resources_per_page — Q: compound latency estimator
 #     Displays P(≥1 request exceeds Px on N resources per page)
 #     Example: with 40 resources, P(≥1 > P99) ≈ 33%
-#   requetes_par_heure     — R: translate percentiles to users affected per hour
+#   requests_per_hour     — R: translate percentiles to users affected per hour
 #     Example: P99 with 10 000 req/h → ~100 users/h affected
-# nb_ressources_par_page: 40
-# requetes_par_heure: 10000
+# resources_per_page: 40
+# requests_per_hour: 10000
 
 # Sites to measure
 # Each site may define an optional SLO (Service Level Objective).
