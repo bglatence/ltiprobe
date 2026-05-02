@@ -254,3 +254,114 @@ IPv4 vs IPv6 sur les mêmes cibles.
 
 Lié à l'item 11 du tableau initial (🔲 à évaluer). Utile pour les environnements dual-stack
 et la migration progressive vers IPv6.
+
+---
+
+## Inspirations — blog "Latency Tip of the Day" (Gil Tene, 2014)
+
+Gil Tene est l'auteur de la bibliothèque HdrHistogram utilisée par ltiprobe. Son blog expose
+les erreurs les plus courantes dans la mesure de latence et les principes pour les éviter.
+Les items ci-dessous en sont directement inspirés.
+
+---
+
+### N. Affichage explicite du Max dans le résumé SLO
+**Inspiré de** *"If you are not measuring and/or plotting Max, what are you hiding (from)?"*
+
+ltiprobe rapporte déjà P99.9, mais ne met pas en avant la valeur maximale observée dans le
+résumé SLO. Or le Max est le seul indicateur qui ne peut pas masquer un incident : un GC pause,
+un cold start, un timeout réseau s'y voient immédiatement. Gil Tene argumente que ne pas
+afficher le Max revient à se cacher la vérité.
+
+Ajout envisagé : une ligne `Max : X ms` dans la section SLO, avec alerte si `max_seuil` est
+dépassé dans le fichier de configuration.
+
+---
+
+### O. Agrégation correcte des percentiles en mode `--interval`
+**Inspiré de** *"You can't average percentiles. Period."*
+
+En mode monitoring continu, il est tentant de moyenner les P99 de chaque fenêtre temporelle —
+ce qui est mathématiquement invalide. La valeur correcte à rapporter est le **max des P99**
+sur la session, ou mieux, maintenir un histogramme HDR cumulatif qui absorbe toutes les
+fenêtres sans perte de précision (ce que `hdrh` supporte nativement via `add()`).
+
+Ajout envisagé : en fin de session `--interval`, afficher le bilan cumulatif (`max P99 observé`,
+`P99.9 global`, `Max absolu`) plutôt qu'une simple moyenne des résultats par fenêtre.
+
+---
+
+### P. Détection de bimodalité de la distribution
+**Inspiré de** *"Average: a random number that falls somewhere between the maximum and 1/2 the median"*
+
+Quand une distribution est bimodale — 95 % des requêtes à 20 ms, 5 % à 800 ms — la moyenne
+tombe entre les deux pics et ne représente aucune réalité mesurable. Gil Tene démontre que
+dans ce cas la moyenne peut être inférieure à la médiane/2, rendant tout raisonnement basé
+sur elle trompeur.
+
+Ajout envisagé : analyser le histogramme HDR pour détecter un gap significatif entre deux
+populations de valeurs et afficher `⚠ distribution bimodale — moyenne non représentative`.
+
+---
+
+### Q. Estimateur d'impact utilisateur par volume de ressources
+**Inspiré de** *"MOST page loads will experience the 99th percentile server response"*
+
+Une page web typique charge 30 à 100 ressources. Avec 42 requêtes parallèles, la probabilité
+qu'un utilisateur subisse au moins une réponse au-delà du P99 est quasi certaine. La formule
+est simple : `P(au moins 1 > seuil) = 1 - (1 - p_dépassement)^N`.
+
+Ajout envisagé : paramètre `nb_ressources_par_page` dans `ltiprobe.yaml`, avec affichage
+`P(≥1 requête > 200ms sur 40 ressources) = 86%` — traduction directe de la latence réseau
+en ressenti utilisateur concret.
+
+---
+
+### R. Traduction des percentiles en utilisateurs affectés
+**Inspiré de** *"Median Server Response Time: The number that 99.9999999% of page views can be worse than"*
+
+Afficher uniquement des ratios (P99 = 1 %) donne une fausse impression de rareté. Avec
+10 000 requêtes par heure, ce 1 % représente 100 utilisateurs toutes les 60 minutes qui vivent
+une expérience dégradée. Gil Tene souligne que le médian est "le nombre dont 99,999…% des
+pages vues peuvent être pires".
+
+Ajout envisagé : paramètre `requetes_par_heure` dans `ltiprobe.yaml`, avec affichage
+`P99 → ~100 utilisateurs/heure affectés` en regard de chaque percentile SLO.
+
+---
+
+### S. Analyse du compound latency (impact page complète)
+**Inspiré de** *"MOST page loads will experience the 99th percentile server response"*
+
+Complémentaire de Q mais plus avancé : simuler N requêtes séquentielles ou parallèles et
+mesurer la latence **totale** de la page (somme séquentielle ou max parallèle), puis en
+rapporter la distribution HDR complète. Cela permet de répondre à "quelle est la latence
+réelle perçue pour le chargement complet d'une page ?" plutôt que "quelle est la latence
+d'une requête individuelle ?".
+
+Ajout envisagé : flag `--compound N` pour exécuter N requêtes et mesurer le temps total.
+
+---
+
+### T. Rapport d'audit de la configuration de monitoring (`--audit`)
+**Inspiré de** *"Q: What's wrong with this picture? A: Everything!"* et *"Measure what you need to monitor"*
+
+Générer un rapport qui critique la configuration ltiprobe elle-même selon les principes de
+Gil Tene : SLO ciblant le P50 (insuffisant), absence de seuil sur le Max, fenêtre de mesure
+trop courte pour capturer les événements rares, utilisation implicite de la moyenne.
+
+Ajout envisagé : `ltiprobe --audit` produit un checklist commenté avec des recommandations
+concrètes de configuration, sans effectuer de mesures réseau.
+
+---
+
+### U. Avertissement sur les opérations invalides sur les percentiles
+**Inspiré de** *"You can't average percentiles. Period."*
+
+Si l'utilisateur compare deux fichiers `--baseline` issus de fenêtres temporelles différentes
+et que ltiprobe calcule implicitement une moyenne de P99, il devrait avertir que l'opération
+est mathématiquement incorrecte. De même pour toute tentative d'agréger des percentiles par
+addition ou division.
+
+Ajout envisagé : détection automatique des contextes où une moyenne de percentiles serait
+calculée, avec message `⚠ averaging percentiles is invalid — use max(P99) or merge raw histograms`.
