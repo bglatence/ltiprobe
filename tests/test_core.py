@@ -30,13 +30,19 @@ def test_i18n_de_header():
     t = get_translator("DE")
     assert "Versuche" in t("header", ver="0.3.0", n=5, cfg="ltiprobe.yaml")
 
+def test_i18n_ja_header():
+    """Le traducteur JA doit produire un message en japonais."""
+    t = get_translator("JA")
+    assert "測定中" in t("header", ver="0.3.0", n=5, cfg="ltiprobe.yaml")
+
 def test_i18n_cles_identiques():
-    """FR, EN, ES et DE doivent avoir exactement les mêmes clés."""
+    """FR, EN, ES, DE et JA doivent avoir exactement les mêmes clés."""
     from ltiprobe.i18n import _TRANSLATIONS
     cles_fr = set(_TRANSLATIONS["FR"].keys())
     assert cles_fr == set(_TRANSLATIONS["EN"].keys())
     assert cles_fr == set(_TRANSLATIONS["ES"].keys())
     assert cles_fr == set(_TRANSLATIONS["DE"].keys())
+    assert cles_fr == set(_TRANSLATIONS["JA"].keys())
 
 def test_verifier_assertions_status_ok():
     """Un site retournant 200 doit valider status_code: 200."""

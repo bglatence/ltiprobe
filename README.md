@@ -202,7 +202,7 @@ Create a `ltiprobe.yaml` file at the root of your project:
 ```yaml
 nb_mesures: 10
 timeout: 10
-langue: EN        # EN, FR, ES or DE
+langue: EN        # EN, FR, ES, DE or JA
 verbosity: full   # full (default) or basic
 
 sites:
@@ -576,7 +576,7 @@ ltiprobe --config-file staging.yaml
 
 ## Multilingual support
 
-Set `langue: EN`, `langue: FR`, `langue: ES` or `langue: DE` in `ltiprobe.yaml`.
+Set `langue: EN`, `langue: FR`, `langue: ES`, `langue: DE` or `langue: JA` in `ltiprobe.yaml`.
 
 ## CSV export (`--csv`)
 
@@ -644,7 +644,7 @@ ltiprobe --config-file staging.yaml               # Fichier de config alternatif
 ```yaml
 nb_mesures: 10
 timeout: 10
-langue: FR        # FR, EN, ES ou DE
+langue: FR        # FR, EN, ES, DE ou JA
 verbosity: full   # full (défaut) ou basic
 
 sites:
