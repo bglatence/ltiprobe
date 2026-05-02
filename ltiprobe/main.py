@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from tqdm import tqdm
 from ltiprobe import config, __version__
 from ltiprobe.i18n import get_translator
+from hdrh.histogram import HdrHistogram as _HdrHistogram
 from ltiprobe.core import (
     mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook,
     creer_histogramme, hdr_enregistrer, hdr_stats,
@@ -402,6 +403,55 @@ def afficher_merge(resultats):
         print("  " + "─" * 60)
         print(t("merge_global", nb=data["nb_total"], p50=_fmt_ms(merged["p50"]), p99=_fmt_ms(merged["p99"])))
 
+def afficher_impact_utilisateur(r, nb_ressources, req_par_heure):
+    """Q + R — Traduit les percentiles en impact utilisateur concret."""
+    if not nb_ressources and not req_par_heure:
+        return
+    print(t("impact_titre"))
+    stats = [
+        ("P50",   r.get("p50"),  50.0),
+        ("P99",   r.get("p99"),  99.0),
+        ("P99.9", r.get("p999"), 99.9),
+    ]
+    if nb_ressources:
+        print(t("impact_ressources_titre", n=nb_ressources))
+        for label, ms, pct in stats:
+            if ms is None:
+                continue
+            prob = (1.0 - (pct / 100.0) ** nb_ressources) * 100.0
+            couleur = ROUGE if prob >= 50 else (ORANGE if prob >= 10 else VERT)
+            print(couleur + t("impact_ressources_ligne",
+                               label=label, ms=_fmt_ms(ms),
+                               prob=f"{prob:.1f}%") + RESET)
+    if req_par_heure:
+        print(t("impact_users_titre", n=req_par_heure))
+        for label, ms, pct in stats:
+            if ms is None:
+                continue
+            n_aff = max(1, round((100.0 - pct) / 100.0 * req_par_heure))
+            couleur = ROUGE if n_aff >= req_par_heure * 0.01 else VERT
+            print(couleur + t("impact_users_ligne",
+                               label=label, ms=_fmt_ms(ms), n=n_aff) + RESET)
+        max_val = r.get("max")
+        if max_val is not None:
+            print(ORANGE + t("impact_users_ligne",
+                              label="Max", ms=_fmt_ms(max_val), n="≥1") + RESET)
+
+def afficher_session_bilan(histos_session, max_p99_session, nb_scans_session):
+    """O — Bilan HDR cumulatif correct en fin de session --interval."""
+    if not histos_session:
+        return
+    total_scans = max(nb_scans_session.values()) if nb_scans_session else 0
+    print(t("session_bilan_titre", scans=total_scans))
+    for url, hist in histos_session.items():
+        nb   = hist.get_total_count()
+        s    = hdr_stats(hist)
+        print(t("session_bilan_url",   url=url, nb=nb))
+        print(t("session_bilan_stats", p50=_fmt_ms(s["p50"]), p99=_fmt_ms(s["p99"]),
+                                        p999=_fmt_ms(s["p999"]), max=_fmt_ms(s["max"])))
+        if url in max_p99_session:
+            print(t("session_bilan_max_p99", v=_fmt_ms(max_p99_session[url])))
+
 def afficher_assertions(assert_checks):
     if not assert_checks:
         return
@@ -462,7 +512,8 @@ def afficher_http_timing(ttfb_p50, transfert_p50, total_p50):
     print(t("transfert", v=_fmt_ms(transfert_p50)))
     print(t("total_p50", v=_fmt_ms(total_p50)))
 
-def afficher_resultat(r, slo_checks=None, comparaison_baseline=None, verbosity="full"):
+def afficher_resultat(r, slo_checks=None, comparaison_baseline=None, verbosity="full",
+                      nb_ressources=None, req_par_heure=None):
     full = verbosity == "full"
 
     if r["erreur"]:
@@ -511,6 +562,8 @@ def afficher_resultat(r, slo_checks=None, comparaison_baseline=None, verbosity="
         afficher_assertions(r.get("assert_checks"))
 
     afficher_analyse_slo(slo_checks)
+    if full:
+        afficher_impact_utilisateur(r, nb_ressources, req_par_heure)
     if comparaison_baseline:
         afficher_comparaison_baseline(comparaison_baseline["lignes"], comparaison_baseline["date"])
     print("")
@@ -804,11 +857,16 @@ def main():
     afficher_reseau(reseau_info)
     print(t("mesures_titre"))
 
-    webhook_cfg = cfg.get("webhook")  # {url, on} ou None si absent du YAML
+    webhook_cfg       = cfg.get("webhook")
+    nb_ressources     = cfg.get("nb_ressources_par_page") or None
+    req_par_heure     = cfg.get("requetes_par_heure") or None
 
     tous_resultats    = []
     prev_results      = {}  # {url: resultat} — dernier résultat réussi par site
     degradation_since = {}  # {url: {metric: heure_str}} — heure de première détection
+    histos_session    = {}  # O — {url: HdrHistogram} cumulatif
+    max_p99_session   = {}  # O — {url: float} max P99 observé
+    nb_scans_session  = {}  # O — {url: int}
 
     iteration = 0
     try:
@@ -830,7 +888,21 @@ def main():
                     if lignes:
                         cmp_baseline = {"lignes": lignes, "date": entry["date"]}
                 r["baseline_comparaison"] = cmp_baseline
-                afficher_resultat(r, r.get("slo_checks"), cmp_baseline, args.verbosity)
+                afficher_resultat(r, r.get("slo_checks"), cmp_baseline, args.verbosity,
+                                  nb_ressources=nb_ressources, req_par_heure=req_par_heure)
+
+                # O — alimenter l'histogramme cumulatif de session
+                if args.interval and not r.get("erreur"):
+                    enc = r.get("hdr_encode")
+                    if enc is not None:
+                        hist_src = _HdrHistogram.decode(enc)
+                        if r["url"] not in histos_session:
+                            histos_session[r["url"]] = creer_histogramme()
+                        histos_session[r["url"]].add(hist_src)
+                        p99 = r.get("p99") or 0.0
+                        if p99 > max_p99_session.get(r["url"], 0.0):
+                            max_p99_session[r["url"]] = p99
+                        nb_scans_session[r["url"]] = nb_scans_session.get(r["url"], 0) + 1
 
                 # Webhook SLO
                 if webhook_cfg and not r.get("erreur"):
@@ -881,6 +953,10 @@ def main():
 
     except KeyboardInterrupt:
         print()
+
+    # O — bilan cumulatif si session --interval avec ≥2 scans
+    if args.interval and histos_session and max(nb_scans_session.values(), default=0) >= 2:
+        afficher_session_bilan(histos_session, max_p99_session, nb_scans_session)
 
     if args.csv and tous_resultats:
         fichier = sauvegarder_csv(tous_resultats)

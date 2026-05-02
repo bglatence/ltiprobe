@@ -89,6 +89,7 @@ _SLO_VERS_RESULTAT = {
     "http_p95_ms":     "p95",
     "http_p99_ms":     "p99",
     "http_p999_ms":    "p999",
+    "http_max_ms":     "max",
     "dns_ms":          "dns_moyenne",
     "stability_ratio": "stability_ratio",
     "icmp_ms":         "icmp_ms",

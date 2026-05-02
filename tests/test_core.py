@@ -943,3 +943,84 @@ def test_merger_histogrammes_sans_hdr_encode(tmp_path):
         f.write("https://example.com,50,100\n")
     result = merger_histogrammes([str(f1)])
     assert result is None
+
+
+# ── N : http_max_ms dans le système SLO ──────────────────────────────────────
+
+def test_slo_http_max_ms():
+    """http_max_ms doit être accepté comme clé SLO valide."""
+    from ltiprobe.core import _SLO_VERS_RESULTAT
+    assert "http_max_ms" in _SLO_VERS_RESULTAT
+    assert _SLO_VERS_RESULTAT["http_max_ms"] == "max"
+
+
+def test_verifier_slo_http_max_ms_ok():
+    """http_max_ms : pas de violation si max < seuil."""
+    resultat = {"p50": 20.0, "p99": 80.0, "max": 150.0,
+                "dns_moyenne": 5.0, "stability_ratio": 3.0,
+                "icmp_ms": None, "icmp_jitter_ms": None, "icmp_loss_pct": None,
+                "tcp_ms": None, "tcp_jitter_ms": None, "tls_ms": None,
+                "mos": None, "http_chaud_ms": None, "nb_hops": None,
+                "p75": 50.0, "p90": 70.0, "p95": 75.0, "p999": 120.0}
+    slo = {"http_max_ms": 200}
+    checks = verifier_slo(resultat, slo)
+    assert checks["http_max_ms"]["ok"] is True
+
+
+def test_verifier_slo_http_max_ms_violation():
+    """http_max_ms : violation si max > seuil."""
+    resultat = {"p50": 20.0, "p99": 80.0, "max": 500.0,
+                "dns_moyenne": 5.0, "stability_ratio": 3.0,
+                "icmp_ms": None, "icmp_jitter_ms": None, "icmp_loss_pct": None,
+                "tcp_ms": None, "tcp_jitter_ms": None, "tls_ms": None,
+                "mos": None, "http_chaud_ms": None, "nb_hops": None,
+                "p75": 50.0, "p90": 70.0, "p95": 75.0, "p999": 120.0}
+    slo = {"http_max_ms": 200}
+    checks = verifier_slo(resultat, slo)
+    assert checks["http_max_ms"]["ok"] is False
+
+
+# ── Q : calcul de la probabilité compound latency ────────────────────────────
+
+def test_impact_compound_p50():
+    """P(≥1 sur N ressources dépasse P50) = 1 - 0.5^N."""
+    n = 10
+    p_ok = 0.50
+    prob = (1.0 - p_ok ** n) * 100.0
+    assert abs(prob - (1 - 0.5 ** 10) * 100) < 0.001
+
+
+def test_impact_compound_p99_40_ressources():
+    """Avec 40 ressources et P99, ~33% de probabilité d'au moins 1 dépassement."""
+    n = 40
+    p_ok = 0.99
+    prob = (1.0 - p_ok ** n) * 100.0
+    assert 32 < prob < 34
+
+
+def test_impact_compound_p999_40_ressources():
+    """Avec 40 ressources et P99.9, ~3.9% de probabilité."""
+    n = 40
+    p_ok = 0.999
+    prob = (1.0 - p_ok ** n) * 100.0
+    assert 3 < prob < 5
+
+
+# ── R : traduction percentiles → utilisateurs/heure ──────────────────────────
+
+def test_impact_users_p99():
+    """P99 avec 10 000 req/h → ~100 utilisateurs affectés."""
+    req = 10_000
+    pct = 99.0
+    n_aff = max(1, round((100.0 - pct) / 100.0 * req))
+    assert n_aff == 100
+
+
+def test_impact_users_p999():
+    """P99.9 avec 10 000 req/h → ~10 utilisateurs affectés."""
+    req = 10_000
+    pct = 99.9
+    n_aff = max(1, round((100.0 - pct) / 100.0 * req))
+    assert n_aff == 10
+
+
