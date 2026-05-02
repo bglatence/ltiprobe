@@ -14,7 +14,9 @@ from ltiprobe.core import (
     mesurer_icmp, mesurer_tcp, mesurer_tls, mesurer_traceroute, inspecter_tls,
     detecter_cdn, est_adresse_ip, verifier_ip_joignable,
     charger_baseline, comparer_baseline, sauvegarder_csv_comparaison,
-    calculer_mos, mesurer_dns_ttl, detecter_reseau, SLO_UNITES, _SEUIL_EXPIRY_ALERTE,
+    calculer_mos, mesurer_dns_ttl, detecter_reseau, decouvrir_path_mtu,
+    mesurer_traceroute_detail,
+    SLO_UNITES, _SEUIL_EXPIRY_ALERTE,
 )
 
 # Codes ANSI — désactivés si la sortie n'est pas un terminal (fichier, CI)
@@ -107,6 +109,10 @@ def parse_arguments():
         metavar="NIVEAU",
         help="Niveau de detail des resultats : basic (mesures HTTP/DNS/SLO) ou full (toutes les sections) (defaut: %(default)s)"
     )
+    parser.add_argument("--path-mtu", action="store_true",
+        help="Decouvrir le Path MTU vers chaque site (recherche binaire via ping -D / -M do)")
+    parser.add_argument("--traceroute-detail", action="store_true",
+        help="Analyse hop-by-hop avec jitter et loss par saut (5 sondages/hop, implique --traceroute)")
     return parser.parse_args(), cfg
 
 # ── Indicateurs colorés ───────────────────────────────────────────────────────
@@ -203,6 +209,38 @@ def afficher_traceroute(tr):
     masques = ("  (" + str(tr["nb_masques"]) + " " + t("hops_masques") + ")") if tr["nb_masques"] else ""
     print(t("traceroute_hops", n=tr["nb_hops"])
           + "  " + indicateur_hops(tr["nb_hops"]) + masques)
+
+_SEUIL_JITTER_MS   = 2.0   # au-delà → alerte orange
+_SEUIL_LOSS_PCT    = 0     # > 0% → alerte orange
+
+def afficher_traceroute_detail(tr_detail, nb_sondages=5):
+    if tr_detail is None:
+        print(t("trdetail_na"))
+        return
+    print(t("trdetail_titre", n=nb_sondages))
+    for h in tr_detail["hops"]:
+        if h["silencieux"]:
+            print(t("trdetail_hop_silencieux", hop=h["hop"]))
+            continue
+        alertes = []
+        if h["jitter"] is not None and h["jitter"] >= _SEUIL_JITTER_MS:
+            alertes.append(ORANGE + t("trdetail_alerte_jitter") + RESET)
+        if h["loss_pct"] and h["loss_pct"] > _SEUIL_LOSS_PCT:
+            alertes.append(ORANGE + t("trdetail_alerte_loss") + RESET)
+        loss_str = (ORANGE + str(h["loss_pct"]) + "%" + RESET) if h["loss_pct"] else (VERT + "0%" + RESET)
+        ligne = t("trdetail_hop",
+                  hop=h["hop"],
+                  ip=h["ip"] or "*",
+                  moy=_fmt_ms(h["moyenne"]),
+                  jitter=_fmt_jitter(h["jitter"]),
+                  loss=loss_str)
+        if h.get("atteint"):
+            ligne = VERT + ligne + RESET
+        print(ligne + "".join(alertes))
+    if tr_detail["destination_atteinte"]:
+        print(VERT + t("trdetail_destination", n=tr_detail["nb_hops"]) + RESET)
+    else:
+        print(ORANGE + t("trdetail_non_atteint", n=tr_detail["nb_hops"]) + RESET)
 
 def afficher_cdn(cdn_info):
     if cdn_info is None:
@@ -319,6 +357,31 @@ def afficher_scoring_standards(icmp_ms, icmp_jitter_ms, icmp_loss_pct):
     print(t("scoring_r_factor", v=r))
     print(t("scoring_mos", v=mos, statut=couleur + statut + RESET, qualite=qualite_str))
 
+def afficher_path_mtu(pmtu):
+    print(t("path_mtu_titre"))
+    if pmtu is None:
+        print(t("path_mtu_na"))
+        return
+    if pmtu.get("blackhole"):
+        print(ROUGE + t("path_mtu_blackhole") + RESET)
+        print(t("path_mtu_sondages", n=pmtu["sondages"]))
+        return
+    mtu = pmtu.get("mtu")
+    if mtu is None:
+        print(t("path_mtu_na"))
+        return
+    if mtu >= 1480:
+        couleur = VERT
+        qualite = t("path_mtu_standard")
+    elif mtu >= 1400:
+        couleur = ORANGE
+        qualite = t("path_mtu_reduit")
+    else:
+        couleur = ROUGE
+        qualite = t("path_mtu_minimal")
+    print(couleur + t("path_mtu_valeur", v=mtu, qualite=qualite) + RESET)
+    print(t("path_mtu_sondages", n=pmtu["sondages"]))
+
 def afficher_assertions(assert_checks):
     if not assert_checks:
         return
@@ -410,7 +473,9 @@ def afficher_resultat(r, slo_checks=None, comparaison_baseline=None, verbosity="
             afficher_dns_ttl(r.get("dns_ttl"))
 
     if full:
-        if r.get("traceroute") is not None:
+        if r.get("traceroute_detail") is not None:
+            afficher_traceroute_detail(r["traceroute_detail"], r.get("trdetail_nb_sondages", 5))
+        elif r.get("traceroute") is not None:
             afficher_traceroute(r["traceroute"])
         if "icmp" in r or "tcp" in r or "tls" in r:
             print("")
@@ -421,6 +486,8 @@ def afficher_resultat(r, slo_checks=None, comparaison_baseline=None, verbosity="
             afficher_cdn(r["cdn_info"])
         if r.get("tls_info") is not None:
             afficher_tls_info(r["tls_info"])
+        if r.get("path_mtu") is not None:
+            afficher_path_mtu(r["path_mtu"])
         afficher_assertions(r.get("assert_checks"))
 
     afficher_analyse_slo(slo_checks)
@@ -469,6 +536,8 @@ def _mesurer_site(site_cfg, args, verify_tls):
     cdn_result       = {}
     tls_info_result  = {}
     dns_ttl_result   = {}
+    pmtu_result       = {}
+    trdetail_result   = {}
 
     icmp_thread = threading.Thread(
         target=lambda: icmp_result.update(
@@ -505,6 +574,17 @@ def _mesurer_site(site_cfg, args, verify_tls):
             {"dns_ttl": mesurer_dns_ttl(hostname, timeout=args.timeout)}
         )
     )
+    pmtu_thread = threading.Thread(
+        target=lambda: pmtu_result.update(
+            {"pmtu": decouvrir_path_mtu(hostname, timeout=args.timeout)}
+        )
+    )
+    _nb_sondages = 5
+    trdetail_thread = threading.Thread(
+        target=lambda: trdetail_result.update(
+            {"trdetail": mesurer_traceroute_detail(hostname, nb_sondages=_nb_sondages, timeout=args.timeout)}
+        )
+    )
 
     icmp_thread.start()
     tcp_thread.start()
@@ -517,6 +597,10 @@ def _mesurer_site(site_cfg, args, verify_tls):
             tls_info_thread.start()
     if args.traceroute:
         tr_thread.start()
+    if getattr(args, "path_mtu", False):
+        pmtu_thread.start()
+    if getattr(args, "traceroute_detail", False):
+        trdetail_thread.start()
 
     # Correction coordinated omission (Gil Tene) : activée uniquement en mode
     # --interval, où un taux de mesure fixe est défini.
@@ -555,6 +639,10 @@ def _mesurer_site(site_cfg, args, verify_tls):
             tls_info_thread.join()
     if args.traceroute:
         tr_thread.join()
+    if getattr(args, "path_mtu", False):
+        pmtu_thread.join()
+    if getattr(args, "traceroute_detail", False):
+        trdetail_thread.join()
 
     if erreur:
         return erreur
@@ -612,6 +700,9 @@ def _mesurer_site(site_cfg, args, verify_tls):
         "co_correction":   intervalle_us is not None,
         "co_intervalle_s": args.interval if intervalle_us else None,
         "dns_ttl":         dns_ttl_result.get("dns_ttl") if not ip_mode else None,
+        "path_mtu":        pmtu_result.get("pmtu") if getattr(args, "path_mtu", False) else None,
+        "traceroute_detail": trdetail_result.get("trdetail") if getattr(args, "traceroute_detail", False) else None,
+        "trdetail_nb_sondages": _nb_sondages,
     }
     slo_checks    = verifier_slo(resultat_final, slo) if slo else None
     assert_checks = verifier_assertions(site, asserts, timeout=args.timeout) if asserts else None

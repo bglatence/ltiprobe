@@ -496,6 +496,73 @@ def mesurer_traceroute(hostname, max_hops=30):
     except Exception:
         return None
 
+def mesurer_traceroute_detail(hostname, nb_sondages=5, max_hops=30, timeout=1):
+    """Analyse hop-by-hop : latence, jitter et loss par saut.
+
+    Utilise traceroute -q nb_sondages pour obtenir plusieurs RTT par hop.
+    Retourne {hops, nb_hops, destination_atteinte} ou None.
+    Chaque hop : {hop, ip, moyenne, min, max, jitter, loss_pct, silencieux, atteint}.
+    """
+    import platform
+    import statistics as _stats
+    hostname = hostname.replace("https://", "").replace("http://", "").split("/")[0]
+    if platform.system() == "Windows":
+        return None
+    cmd = ["traceroute", "-n", "-q", str(nb_sondages), "-w", str(timeout),
+           "-m", str(max_hops), hostname]
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True,
+            timeout=max_hops * (nb_sondages * timeout + 2)
+        )
+        destination_ip = None
+        hops = []
+        for line in result.stdout.splitlines():
+            m = re.match(r"^\s*(\d+)\s+", line)
+            if not m:
+                dm = re.search(r"\((\d+\.\d+\.\d+\.\d+)\)", line)
+                if dm:
+                    destination_ip = dm.group(1)
+                continue
+            hop_num = int(m.group(1))
+            reste   = line[m.end():]
+            ip_m    = re.search(r"(\d+\.\d+\.\d+\.\d+)", reste)
+            ip      = ip_m.group(1) if ip_m else None
+            rtts    = [float(v) for v in re.findall(r"(\d+\.?\d*)\s*ms", reste)]
+            nb_perdus = max(0, nb_sondages - len(rtts))
+            loss_pct  = round(nb_perdus / nb_sondages * 100) if nb_sondages else 0
+            silencieux = len(rtts) == 0
+            if rtts:
+                moyenne = round(sum(rtts) / len(rtts), 2)
+                mini    = round(min(rtts), 2)
+                maxi    = round(max(rtts), 2)
+                jitter  = round(_stats.stdev(rtts), 2) if len(rtts) > 1 else 0.0
+            else:
+                moyenne = mini = maxi = jitter = None
+            atteint = (ip == destination_ip) if destination_ip and ip else False
+            hops.append({
+                "hop":        hop_num,
+                "ip":         ip,
+                "moyenne":    moyenne,
+                "min":        mini,
+                "max":        maxi,
+                "jitter":     jitter,
+                "loss_pct":   loss_pct,
+                "silencieux": silencieux,
+                "atteint":    atteint,
+            })
+        if not hops:
+            return None
+        if not any(h["atteint"] for h in hops):
+            hops[-1]["atteint"] = hops[-1]["hop"] < max_hops
+        return {
+            "hops":                 hops,
+            "nb_hops":              hops[-1]["hop"],
+            "destination_atteinte": any(h["atteint"] for h in hops),
+        }
+    except Exception:
+        return None
+
 def mesurer_tls(hostname, nb_mesures=5, timeout=10, verify=True):
     """Mesure la latence du handshake TLS seul (après TCP connect).
 
@@ -640,6 +707,77 @@ def mesurer_icmp(hostname, nb_mesures=5):
         }
     except Exception:
         return None
+
+def decouvrir_path_mtu(hostname, mtu_max=1500, timeout=1):
+    """Découvre le Path MTU par dichotomie de sondes ICMP avec bit DF (Don't Fragment).
+
+    Utilise ping -D (macOS) ou ping -M do (Linux) — pas de raw socket requis.
+    Payload = MTU candidat - 28 octets (en-tête IP 20 + en-tête ICMP 8).
+
+    Retourne un dict :
+      mtu       : int | None  — Path MTU découvert en octets
+      sondages  : int         — nombre de sondes envoyées
+      blackhole : bool        — True si même les petits paquets DF échouent
+    Retourne None si ping ou la plateforme n'est pas supporté.
+    """
+    import platform
+
+    hostname = hostname.replace("https://", "").replace("http://", "").split("/")[0]
+    sys_name = platform.system()
+
+    def sonder(taille_mtu):
+        """Retourne True si un paquet de taille_mtu octets passe, False sinon, None si erreur."""
+        payload = taille_mtu - 28
+        if payload < 8:
+            return False
+        try:
+            if sys_name == "Darwin":
+                cmd = ["ping", "-D", "-s", str(payload), "-c", "1",
+                       "-W", str(int(timeout * 1000)), hostname]
+            elif sys_name == "Linux":
+                cmd = ["ping", "-M", "do", "-s", str(payload), "-c", "1",
+                       "-W", str(int(timeout)), hostname]
+            else:
+                return None
+            result = subprocess.run(
+                cmd, capture_output=True, text=True,
+                timeout=timeout + 2
+            )
+            return result.returncode == 0
+        except Exception:
+            return None
+
+    sondages = 0
+
+    # Test rapide au MTU standard
+    res = sonder(mtu_max)
+    sondages += 1
+    if res is None:
+        return None
+    if res:
+        return {"mtu": mtu_max, "sondages": sondages, "blackhole": False}
+
+    # Test au minimum pour détecter un blackhole PMTUD
+    mtu_min = 576
+    if not sonder(mtu_min):
+        sondages += 1
+        return {"mtu": None, "sondages": sondages, "blackhole": True}
+    sondages += 1
+
+    # Dichotomie entre mtu_min et mtu_max
+    lo, hi = mtu_min, mtu_max
+    mtu_trouve = mtu_min
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        res = sonder(mid)
+        sondages += 1
+        if res:
+            lo = mid
+            mtu_trouve = mid
+        else:
+            hi = mid
+
+    return {"mtu": mtu_trouve, "sondages": sondages, "blackhole": False}
 
 def mesurer_dns(hostname):
     """Mesure uniquement le temps de resolution DNS. Retourne ms ou None."""

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pytest
-from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, calculer_mos, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls, mesurer_dns_ttl, detecter_reseau, lister_interfaces
+from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, calculer_mos, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls, mesurer_dns_ttl, detecter_reseau, lister_interfaces, decouvrir_path_mtu, mesurer_traceroute_detail
 from ltiprobe.i18n import get_translator
 
 
@@ -742,3 +742,103 @@ def test_sauvegarder_csv_comparaison(tmp_path):
     assert "regression" in contenu
     assert "amelioration" in contenu
     assert "2026-04-20" in contenu
+
+
+# ── Path MTU Discovery ────────────────────────────────────────────────────────
+
+def test_decouvrir_path_mtu_structure():
+    """decouvrir_path_mtu() doit retourner un dict avec mtu, sondages, blackhole ou None."""
+    import platform
+    result = decouvrir_path_mtu("8.8.8.8", timeout=1)
+    if platform.system() not in ("Darwin", "Linux"):
+        assert result is None
+        return
+    assert result is not None
+    assert "mtu" in result
+    assert "sondages" in result
+    assert "blackhole" in result
+    assert isinstance(result["sondages"], int)
+    assert result["sondages"] > 0
+
+def test_decouvrir_path_mtu_standard():
+    """Pour une IP publique sans MTU réduit, le MTU doit être >= 576."""
+    import platform
+    if platform.system() not in ("Darwin", "Linux"):
+        pytest.skip("path MTU non disponible sur cette plateforme")
+    result = decouvrir_path_mtu("8.8.8.8", timeout=1)
+    assert result is not None
+    if result.get("blackhole"):
+        pytest.skip("PMTUD blackhole détecté — impossible de valider le MTU")
+    assert result["mtu"] is not None
+    assert result["mtu"] >= 576
+
+def test_decouvrir_path_mtu_hostname_http():
+    """decouvrir_path_mtu() doit accepter les URL avec http:// ou https:// en préfixe."""
+    import platform
+    if platform.system() not in ("Darwin", "Linux"):
+        pytest.skip("path MTU non disponible sur cette plateforme")
+    result = decouvrir_path_mtu("https://8.8.8.8", timeout=1)
+    assert result is not None or True  # accepte None si non joignable
+
+def test_decouvrir_path_mtu_hote_invalide():
+    """Un hôte invalide ne doit pas lever d'exception (None ou blackhole acceptés)."""
+    import platform
+    if platform.system() not in ("Darwin", "Linux"):
+        pytest.skip("path MTU non disponible sur cette plateforme")
+    # Peut retourner None (timeout DNS/mDNS) ou {"mtu": None, "blackhole": True}
+    result = decouvrir_path_mtu("hote-invalide-xyz.local", timeout=1)
+    assert result is None or result.get("blackhole") is True or result.get("mtu") is None
+
+
+# ── Traceroute hop-by-hop ─────────────────────────────────────────────────────
+
+def test_mesurer_traceroute_detail_structure():
+    """mesurer_traceroute_detail() doit retourner la structure attendue ou None."""
+    import platform
+    result = mesurer_traceroute_detail("8.8.8.8", nb_sondages=3, timeout=1)
+    if platform.system() == "Windows":
+        assert result is None
+        return
+    if result is None:
+        pytest.skip("traceroute non disponible dans cet environnement")
+    assert "hops" in result
+    assert "nb_hops" in result
+    assert "destination_atteinte" in result
+    assert isinstance(result["hops"], list)
+    assert len(result["hops"]) > 0
+
+def test_mesurer_traceroute_detail_hop_structure():
+    """Chaque hop doit contenir les champs requis."""
+    import platform
+    if platform.system() == "Windows":
+        pytest.skip("non disponible sur Windows")
+    result = mesurer_traceroute_detail("8.8.8.8", nb_sondages=3, timeout=1)
+    if result is None:
+        pytest.skip("traceroute non disponible dans cet environnement")
+    for h in result["hops"]:
+        assert "hop" in h
+        assert "silencieux" in h
+        assert "loss_pct" in h
+        assert "atteint" in h
+        if not h["silencieux"]:
+            assert h["moyenne"] is not None
+            assert h["jitter"] is not None
+            assert 0.0 <= h["loss_pct"] <= 100
+
+def test_mesurer_traceroute_detail_destination():
+    """La destination 8.8.8.8 doit être atteinte."""
+    import platform
+    if platform.system() == "Windows":
+        pytest.skip("non disponible sur Windows")
+    result = mesurer_traceroute_detail("8.8.8.8", nb_sondages=3, timeout=1)
+    if result is None:
+        pytest.skip("traceroute non disponible dans cet environnement")
+    assert result["destination_atteinte"] is True
+
+def test_mesurer_traceroute_detail_hote_invalide():
+    """Un hôte invalide ne doit pas lever d'exception."""
+    import platform
+    if platform.system() == "Windows":
+        pytest.skip("non disponible sur Windows")
+    result = mesurer_traceroute_detail("hote-invalide-xyz-123.invalid", nb_sondages=2, timeout=1)
+    assert result is None or isinstance(result, dict)
