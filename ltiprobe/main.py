@@ -63,59 +63,59 @@ def parse_arguments():
 
     parser = argparse.ArgumentParser(
         prog="ltiprobe",
-        description="Mesure les temps de reponse HTTP de sites web"
+        description="HTTP/DNS/ICMP/TCP/TLS latency measurement tool with SLO validation and HDR histograms"
     )
     parser.add_argument("--version", action="version", version=f"ltiprobe {__version__}")
     parser.add_argument(
         "--config-file",
         default=None,
-        metavar="FICHIER",
-        help=f"Fichier de configuration YAML (defaut: {config.FICHIER_DEFAUT})"
+        metavar="FILE",
+        help=f"YAML configuration file (default: {config.FICHIER_DEFAUT})"
     )
     parser.add_argument(
         "sites", nargs="*",
-        help="Sites a tester (ex: https://google.com https://github.com)"
+        help="Sites to measure (e.g. https://google.com https://github.com)"
     )
     parser.add_argument(
         "-n", "--nombre", type=int, default=cfg["nb_mesures"],
-        help="Nombre de mesures par site (defaut: %(default)s)"
+        help="Number of measurements per site (default: %(default)s)"
     )
     parser.add_argument("--csv", action="store_true",
-        help="Sauvegarder les resultats dans un fichier CSV")
+        help="Save results to a CSV file")
     parser.add_argument(
         "--timeout", type=int, default=cfg["timeout"],
-        help="Timeout en secondes (defaut: %(default)s)"
+        help="Timeout in seconds (default: %(default)s)"
     )
     parser.add_argument("--traceroute", action="store_true",
-        help="Afficher le nombre de hops reseau vers chaque site")
+        help="Show network hop count to each site")
     parser.add_argument("--no-verify-tls", action="store_true",
-        help="Desactiver la validation du certificat TLS (utile pour les adresses IP)")
+        help="Disable TLS certificate validation (useful for self-signed certs or direct IPs)")
     parser.add_argument(
-        "--interval", type=int, default=None, metavar="SECONDES",
-        help="Relancer les mesures toutes les N secondes (monitoring continu)"
+        "--interval", type=int, default=None, metavar="SECONDS",
+        help="Re-run measurements every N seconds (continuous monitoring)"
     )
     parser.add_argument(
-        "--baseline", default=None, metavar="FICHIER",
-        help="CSV de reference pour detecter les regressions de performance"
+        "--baseline", default=None, metavar="FILE",
+        help="Reference CSV file to detect performance regressions"
     )
     parser.add_argument(
-        "--prometheus-out", default=None, metavar="FICHIER",
-        help="Exporter les metriques au format Prometheus text (ex: metrics.prom)"
+        "--prometheus-out", default=None, metavar="FILE",
+        help="Export metrics in Prometheus text format (e.g. metrics.prom)"
     )
     parser.add_argument("--tls-info", action="store_true",
-        help="Afficher les informations avancees du certificat TLS (version, cipher, expiry, HSTS)")
+        help="Show advanced TLS certificate details (version, cipher, expiry, HSTS)")
     parser.add_argument(
         "--verbosity", choices=["basic", "full"], default=cfg.get("verbosity", "full"),
-        metavar="NIVEAU",
-        help="Niveau de detail des resultats : basic (mesures HTTP/DNS/SLO) ou full (toutes les sections) (defaut: %(default)s)"
+        metavar="LEVEL",
+        help="Output detail level: basic (HTTP/DNS/SLO only) or full (all sections, default: %(default)s)"
     )
     parser.add_argument("--path-mtu", action="store_true",
-        help="Decouvrir le Path MTU vers chaque site (recherche binaire via ping -D / -M do)")
+        help="Discover effective Path MTU to each site (binary search via ping -D / -M do)")
     parser.add_argument("--traceroute-detail", action="store_true",
-        help="Analyse hop-by-hop avec jitter et loss par saut (5 sondages/hop, implique --traceroute)")
+        help="Hop-by-hop analysis with jitter and loss per hop (5 probes/hop, implies --traceroute)")
     parser.add_argument(
-        "--merge", nargs="+", metavar="FICHIER",
-        help="Fusionner plusieurs fichiers CSV ltiprobe et afficher les statistiques HDR combinées"
+        "--merge", nargs="+", metavar="FILE",
+        help="Merge HDR histograms from multiple ltiprobe CSV exports and display combined statistics"
     )
     return parser.parse_args(), cfg
 
