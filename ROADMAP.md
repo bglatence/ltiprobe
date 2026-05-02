@@ -31,6 +31,17 @@ Analyse comparative approfondie incluant : hey, vegeta, wrk2, mtr, smokeping, bl
 gatling, locust, et les solutions enterprise **Spirent**, **Accedian (Cisco)**, **Viavi**,
 **Keysight (Ixia)**, **ThousandEyes**, **Catchpoint**, **Dynatrace Synthetic**.
 
+| # | Évolution | Statut |
+|---|---|---|
+| A | Jitter + packet loss | ✅ v1.0.0 |
+| B | MOS score (ITU-T G.107) | ✅ v1.0.0 |
+| C | Correction coordinated omission | ✅ v1.0.0 |
+| D | Comportement du cache DNS (TTL) | ✅ v1.0.0 |
+| E | Path MTU discovery (`--path-mtu`) | ✅ v1.4.0 |
+| F | Analyse hop-by-hop jitter/loss (`--traceroute-detail`) | ✅ v1.5.0 |
+| G | TLS session resumption timing | 🔲 à évaluer |
+| H | Merge d'histogrammes distribués (`--merge`) | ✅ v1.5.5 |
+
 ---
 
 ### A. Jitter + packet loss
@@ -179,13 +190,67 @@ aucune approximation, la fusion est exacte sur les percentiles.
 | Webhook d'alerte SLO | ✅ | — | — | — | ✅ |
 | Validation HTTP (status, body, header) | ✅ | — | — | ✅ | ✅ |
 | Configuration YAML multi-sites | ✅ | — | — | ✅ | ✅ |
-| **Jitter (StDev RTT)** | 🔲 | — | ✅ | — | ✅ |
-| **Packet loss %** | 🔲 | — | ✅ | ✅ | ✅ |
-| **MOS score** | 🔲 | — | — | — | ✅ |
-| **Correction coordinated omission** | 🔲 | — | — | — | ✅ |
-| **DNS TTL / cache behavior** | 🔲 | — | — | — | ✅ |
-| **Path MTU discovery** | 🔲 | — | — | — | ✅ |
-| **Hop-by-hop jitter/loss + AS lookup** | 🔲 | — | ✅ | — | ✅ |
+| **Jitter (StDev RTT)** | ✅ v1.0 | — | ✅ | — | ✅ |
+| **Packet loss %** | ✅ v1.0 | — | ✅ | ✅ | ✅ |
+| **MOS score** | ✅ v1.0 | — | — | — | ✅ |
+| **Correction coordinated omission** | ✅ v1.0 | — | — | — | ✅ |
+| **DNS TTL / cache behavior** | ✅ v1.0 | — | — | — | ✅ |
+| **Path MTU discovery** | ✅ v1.4 | — | — | — | ✅ |
+| **Hop-by-hop jitter/loss par saut** | ✅ v1.5 | — | ✅ | — | ✅ |
 | **TLS session resumption timing** | 🔲 | — | — | — | ✅ |
-| **Merge histogrammes distribués** | 🔲 | — | — | — | — |
-| Multi-langue (FR/EN) | ✅ | — | — | — | — |
+| **Merge histogrammes distribués** | ✅ v1.5.5 | — | — | — | — |
+| Multi-langue (FR/EN/ES/DE/JA/ZH/PT) | ✅ v1.5 | — | — | — | — |
+
+---
+
+## Évolutions futures envisagées
+
+Items identifiés pour les prochaines itérations. Aucune priorité définie à ce stade.
+
+---
+
+### I. Mécanisme de collecte automatique (exécution distribuée)
+
+Permettre à plusieurs instances de ltiprobe (sondes géographiquement distribuées) d'envoyer
+automatiquement leurs résultats CSV vers un point de collecte central, pour alimenter le
+`--merge` sans étape manuelle.
+
+Pistes envisagées : push vers S3/objet, endpoint HTTP POST, ou bus de messages léger.
+Complémentaire de l'évolution H déjà livrée (merge local).
+
+---
+
+### J. Interface utilisateur web
+
+Créer une interface de visualisation des résultats ltiprobe : tableau de bord des mesures,
+graphiques de distribution HDR, suivi des SLO dans le temps, comparaison multi-sites.
+
+Pourrait s'appuyer sur les CSV et exports Prometheus existants comme source de données.
+
+---
+
+### K. Application mobile Android
+
+Portage ou client mobile Android permettant de lancer des mesures ltiprobe depuis un appareil
+mobile et de visualiser les résultats — utile pour les audits terrain et la comparaison
+Wi-Fi / cellulaire / filaire.
+
+---
+
+### L. Évaluation et mesure de l'option BBR (TCP)
+
+Mesurer l'impact de l'algorithme de contrôle de congestion BBR (Bottleneck Bandwidth and
+Round-trip propagation time, Google) sur la latence et le débit perçu, et détecter si le
+serveur distant l'utilise.
+
+Cas d'usage : comparaison CUBIC vs BBR sur des liens à forte latence ou à perte de paquets.
+
+---
+
+### M. Support IPv6
+
+Ajouter la prise en charge native d'IPv6 : résolution AAAA, mesures ICMP6, comparaison
+IPv4 vs IPv6 sur les mêmes cibles.
+
+Lié à l'item 11 du tableau initial (🔲 à évaluer). Utile pour les environnements dual-stack
+et la migration progressive vers IPv6.
