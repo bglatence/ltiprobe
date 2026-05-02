@@ -1,66 +1,33 @@
-# ltiprobe — fichier de configuration
-# Placez ce fichier à la racine du projet ou dans le répertoire de travail.
+# ltiprobe.yaml — tool configuration
+# Place this file in the project root or current working directory.
+# Sites to measure are defined in sites.yaml (loaded automatically).
 
-# Nombre de mesures par site
-nb_mesures: 10
+# Number of measurements per site
+nb_measures: 10
 
-# Timeout HTTP en secondes
+# HTTP timeout in seconds
 timeout: 10
 
-# Langue d'affichage : FR (français) ou EN (anglais)
-langue: EN
+# Display language: FR | EN | ES | DE | JA | ZH | PT
+language: EN
 
-# Niveau de détail des résultats
-#   basic — HTTP percentiles, DNS, stabilité, SLO
-#   full  — basic + HTTP timing, DNS cache/TTL, Protocol comparison,
-#            Scoring Standards (MOS), Cache/CDN, TLS Certificate, Assertions
+# Output verbosity
+#   basic — HTTP percentiles, DNS, stability, SLO
+#   full  — basic + HTTP timing, DNS cache/TTL, protocol comparison,
+#            Scoring Standards (MOS), Cache/CDN, TLS certificate, assertions
 verbosity: full
 
-# Liste des sites à mesurer
-# Chaque site peut définir un SLO (Service Level Objective) optionnel.
-# Clés SLO disponibles :
-#   http_p50_ms     — latence HTTP médiane (P50)
-#   http_p75_ms     — latence HTTP P75
-#   http_p90_ms     — latence HTTP P90
-#   http_p95_ms     — latence HTTP P95
-#   http_p99_ms     — latence HTTP P99
-#   http_p999_ms    — latence HTTP P99.9
-#   dns_ms          — latence DNS moyenne
-#   stability_ratio — ratio p99/p50 (ex: 1.5 signifie p99 <= 1.5x p50)
-#   icmp_ms         — latence ICMP (réseau) moyenne
-#   icmp_jitter_ms  — jitter ICMP (écart-type des RTT)
-#   icmp_loss_pct   — taux de perte ICMP en % (ex: 5 = max 5% de perte)
-#   tcp_ms          — latence handshake TCP moyenne
-#   tcp_jitter_ms   — jitter TCP (écart-type des RTT)
-#   tls_ms          — latence handshake TLS moyenne
-#   http_chaud_ms   — latence HTTP estimée keep-alive (sans TCP/TLS)
-#   nb_hops_max     — nombre de hops maximum (requiert --traceroute)
-#   mos_min         — score MOS ITU-T G.107 minimum (plus haut = meilleur, ex: 3.6)
-#
-# Assertions de validation HTTP (clé "assert") :
-#   status_code     — code HTTP attendu (ex: 200)
-#   body_contains   — chaîne attendue dans les premiers 4 Ko du body
-#   header          — "Clé: Valeur" ou "Clé" (vérifie la présence)
-sites:
-  - url: https://google.com
-    slo:
-      http_p50_ms: 300
-      http_p95_ms: 400
-      dns_ms: 50
-      stability_ratio: 5
-      tls_ms: 80
-    assert:
-      status_code: 200
-      body_contains: "google"
+# User impact analysis (optional)
+#   resources_per_page — Q: compound latency estimator
+#     Displays P(≥1 request exceeds Px on N resources per page)
+#     Example: with 40 resources, P(≥1 > P99) ≈ 33%
+#   requests_per_hour  — R: translate percentiles to users affected per hour
+#     Example: P99 with 10 000 req/h → ~100 users/h affected
+# resources_per_page: 40
+# requests_per_hour: 10000
 
-  - url: https://youtube.com
-    slo:
-      http_p50_ms: 300
-      http_p95_ms: 600
-      dns_ms: 80
-      icmp_ms: 50
-      icmp_loss_pct: 5
-      mos_min: 3.6      # qualité VoIP "acceptable" selon ITU-T G.107
-
-  - url: https://apple.com
-    # aucun SLO défini pour ce site
+# Webhook alerts (optional)
+#   on: slo_violation | degradation | all
+# webhook:
+#   url: https://hooks.slack.com/services/xxx/yyy/zzz
+#   on: slo_violation

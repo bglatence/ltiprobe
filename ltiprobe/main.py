@@ -78,8 +78,12 @@ def parse_arguments():
         help="Sites to measure (e.g. https://google.com https://github.com)"
     )
     parser.add_argument(
-        "-n", "--nombre", type=int, default=cfg["nb_mesures"],
+        "-n", "--nombre", type=int, default=cfg["nb_measures"],
         help="Number of measurements per site (default: %(default)s)"
+    )
+    parser.add_argument(
+        "--sites-file", default=None, metavar="FILE",
+        help=f"YAML file containing the list of sites to measure (default: {config.FICHIER_SITES_DEFAUT})"
     )
     parser.add_argument("--csv", action="store_true",
         help="Save results to a CSV file")
@@ -200,9 +204,9 @@ def afficher_protocoles(icmp, tcp, tls, http_p50, site):
         prev = tls_moy or tcp_moy or icmp_moy
         print(t("proto_http_froid", v=_fmt_ms(http_p50)) + _delta(prev, http_p50))
         surcharge = round((tcp_moy or 0) + (tls_moy or 0), 1)
-        http_chaud = round(http_p50 - surcharge, 1)
-        if surcharge > 0 and http_chaud > 0:
-            print(t("proto_http_chaud", v=_fmt_ms(http_chaud)))
+        http_keepalive = round(http_p50 - surcharge, 1)
+        if surcharge > 0 and http_keepalive > 0:
+            print(t("proto_http_keepalive", v=_fmt_ms(http_keepalive)))
 
 def afficher_traceroute(tr):
     if tr is None:
@@ -735,7 +739,7 @@ def _mesurer_site(site_cfg, args, verify_tls):
     tcp_moy    = tcp["moyenne"] if tcp else None
     tls_moy    = tls["moyenne"] if tls else None
     surcharge  = round((tcp_moy or 0) + (tls_moy or 0), 1)
-    http_chaud = round(p50 - surcharge, 1) if surcharge > 0 and p50 > surcharge else None
+    http_keepalive = round(p50 - surcharge, 1) if surcharge > 0 and p50 > surcharge else None
 
     resultat_final = {
         "url":         site,
@@ -762,7 +766,7 @@ def _mesurer_site(site_cfg, args, verify_tls):
         "tcp_ms":          tcp_moy,
         "tcp_jitter_ms":   tcp["jitter"] if tcp else None,
         "tls_ms":          tls_moy,
-        "http_chaud_ms":   http_chaud,
+        "http_keepalive_ms":   http_keepalive,
         "nb_hops":         traceroute["nb_hops"] if traceroute else None,
         "tls_info":        tls_info_result.get("tls_info") if args.tls_info and is_https else None,
         "mos":             calculer_mos(
@@ -826,7 +830,7 @@ def main():
         print("Erreur : " + str(e), file=sys.stderr)
         sys.exit(1)
 
-    t = get_translator(cfg.get("langue", "FR").upper())
+    t = get_translator(cfg.get("language", "FR").upper())
     verify_tls = not args.no_verify_tls
 
     if args.merge:
@@ -842,13 +846,25 @@ def main():
             print(str(e), file=sys.stderr)
             sys.exit(1)
 
+    # Sites loading priority:
+    # 1. CLI positional args  (ltiprobe https://example.com)
+    # 2. --sites-file FILE    (explicit override)
+    # 3. sites.yaml           (auto-detected if present)
+    # 4. ltiprobe.yaml sites: (backward compatibility)
     if args.sites:
         sites_config = [{"url": s} for s in args.sites]
     else:
-        sites_config = [
-            s if isinstance(s, dict) else {"url": s}
-            for s in cfg["sites"]
-        ]
+        try:
+            sites_config = config.charger_sites(args.sites_file)
+        except (FileNotFoundError, ValueError) as e:
+            print(str(e), file=sys.stderr)
+            sys.exit(1)
+        if not sites_config:
+            # fallback: sites: key in ltiprobe.yaml
+            sites_config = [
+                s if isinstance(s, dict) else {"url": s}
+                for s in cfg.get("sites", [])
+            ]
 
     cfg_file = args.config_file or config.FICHIER_DEFAUT
     print(t("header", ver=__version__, n=args.nombre, cfg=cfg_file) + "\n")
@@ -858,8 +874,8 @@ def main():
     print(t("mesures_titre"))
 
     webhook_cfg       = cfg.get("webhook")
-    nb_ressources     = cfg.get("nb_ressources_par_page") or None
-    req_par_heure     = cfg.get("requetes_par_heure") or None
+    nb_ressources     = cfg.get("resources_per_page") or None
+    req_par_heure     = cfg.get("requests_per_hour") or None
 
     tous_resultats    = []
     prev_results      = {}  # {url: resultat} — dernier résultat réussi par site

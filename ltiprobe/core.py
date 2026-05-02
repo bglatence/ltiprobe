@@ -99,7 +99,7 @@ _SLO_VERS_RESULTAT = {
     "tcp_jitter_ms":   "tcp_jitter_ms",
     "tls_ms":          "tls_ms",
     "mos_min":         "mos",
-    "http_chaud_ms":   "http_chaud_ms",
+    "http_keepalive_ms": "http_keepalive_ms",
     "nb_hops_max":     "nb_hops",
 }
 
@@ -842,7 +842,7 @@ def extraire_hostname(url):
 
 def mesurer_site(url, nb_mesures=None, timeout=None, verify_tls=True):
     """Mesure le temps de reponse HTTP et DNS d'un site. Retourne un dict."""
-    nb = nb_mesures or config.NB_MESURES
+    nb = nb_mesures or config.NB_MEASURES
     to = timeout or config.TIMEOUT
     hist_http = creer_histogramme()
     mesures_dns  = []

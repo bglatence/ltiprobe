@@ -200,9 +200,9 @@ https://google.com
 Create a `ltiprobe.yaml` file at the root of your project:
 
 ```yaml
-nb_mesures: 10
+nb_measures: 10
 timeout: 10
-langue: EN        # EN, FR, ES, DE, JA, ZH or PT
+language: EN      # EN, FR, ES, DE, JA, ZH or PT
 verbosity: full   # full (default) or basic
 
 sites:
@@ -214,7 +214,7 @@ sites:
       tls_ms: 80            # max TLS handshake
       icmp_ms: 30           # max network (ICMP) latency
       tcp_ms: 40            # max TCP handshake
-      http_chaud_ms: 150    # max keep-alive HTTP (no TCP/TLS)
+      http_keepalive_ms: 150    # max keep-alive HTTP (no TCP/TLS)
       stability_ratio: 5    # max P99/P50 ratio
       nb_hops_max: 25       # max network hops (--traceroute)
       mos_min: 3.6          # min MOS score 1.0–4.5 (ITU-T G.107)
@@ -247,7 +247,7 @@ If the file is absent, ltiprobe starts with default sites and values.
 | `icmp_loss_pct` | ICMP packet loss percentage |
 | `tcp_ms` | TCP handshake duration |
 | `tcp_jitter_ms` | TCP jitter |
-| `http_chaud_ms` | Estimated keep-alive HTTP (no TCP/TLS) |
+| `http_keepalive_ms` | Estimated keep-alive HTTP (no TCP/TLS) |
 | `stability_ratio` | P99/P50 ratio (e.g. `5` means P99 ≤ 5× P50) |
 | `nb_hops_max` | Max network hops (requires `--traceroute`) |
 | `mos_min` | Minimum MOS score 1.0–4.5 — inverted check: fails if MOS **below** threshold |
@@ -576,7 +576,7 @@ ltiprobe --config-file staging.yaml
 
 ## Multilingual support
 
-Set `langue: EN`, `langue: FR`, `langue: ES`, `langue: DE`, `langue: JA`, `langue: ZH` or `langue: PT` in `ltiprobe.yaml`.
+Set `language: EN`, `language: FR`, `language: ES`, `language: DE`, `language: JA`, `language: ZH` or `language: PT` in `ltiprobe.yaml`.
 
 ## CSV export (`--csv`)
 
@@ -642,9 +642,9 @@ ltiprobe --config-file staging.yaml               # Fichier de config alternatif
 ### Configuration (`ltiprobe.yaml`)
 
 ```yaml
-nb_mesures: 10
+nb_measures: 10
 timeout: 10
-langue: FR        # FR, EN, ES, DE, JA, ZH ou PT
+language: FR      # FR, EN, ES, DE, JA, ZH ou PT
 verbosity: full   # full (défaut) ou basic
 
 sites:
@@ -680,7 +680,7 @@ webhook:
 | `icmp_loss_pct` | Taux de perte ICMP |
 | `tcp_ms` | Durée du handshake TCP |
 | `tcp_jitter_ms` | Jitter TCP |
-| `http_chaud_ms` | HTTP keep-alive estimé (sans TCP/TLS) |
+| `http_keepalive_ms` | HTTP keep-alive estimé (sans TCP/TLS) |
 | `stability_ratio` | Ratio P99/P50 |
 | `nb_hops_max` | Hops réseau max (requiert `--traceroute`) |
 | `mos_min` | Score MOS minimum 1.0–4.5 — violation si MOS **en dessous** du seuil |
@@ -825,7 +825,7 @@ pip install ltiprobe
 ltiprobe --help
 ```
 
-Configuración: cree un archivo `ltiprobe.yaml` con `langue: ES` para activar la interfaz en español.
+Configuración: cree un archivo `ltiprobe.yaml` con `language: ES` para activar la interfaz en español.
 
 ---
 
@@ -851,7 +851,7 @@ pip install ltiprobe
 ltiprobe --help
 ```
 
-Konfiguration: erstellen Sie eine Datei `ltiprobe.yaml` mit `langue: DE`, um die deutsche Oberfläche zu aktivieren.
+Konfiguration: erstellen Sie eine Datei `ltiprobe.yaml` mit `language: DE`, um die deutsche Oberfläche zu aktivieren.
 
 ---
 
@@ -877,7 +877,7 @@ pip install ltiprobe
 ltiprobe --help
 ```
 
-設定：`ltiprobe.yaml` に `langue: JA` を記述すると日本語インターフェースが有効になります。
+設定：`ltiprobe.yaml` に `language: JA` を記述すると日本語インターフェースが有効になります。
 
 ---
 
@@ -903,7 +903,7 @@ pip install ltiprobe
 ltiprobe --help
 ```
 
-配置：在 `ltiprobe.yaml` 中设置 `langue: ZH` 即可启用中文界面。
+配置：在 `ltiprobe.yaml` 中设置 `language: ZH` 即可启用中文界面。
 
 ---
 
@@ -929,4 +929,4 @@ pip install ltiprobe
 ltiprobe --help
 ```
 
-Configuração: crie um arquivo `ltiprobe.yaml` com `langue: PT` para ativar a interface em português.
+Configuração: crie um arquivo `ltiprobe.yaml` com `language: PT` para ativar a interface em português.

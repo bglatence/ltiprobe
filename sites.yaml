@@ -1,0 +1,53 @@
+# sites.yaml — sites to measure
+# Use --sites-file to specify an alternate file (e.g. ltiprobe --sites-file staging.yaml).
+#
+# Each entry is a URL with optional SLO thresholds and HTTP assertions.
+#
+# Available SLO keys:
+#   http_p50_ms      — median HTTP latency (P50)
+#   http_p75_ms      — HTTP latency P75
+#   http_p90_ms      — HTTP latency P90
+#   http_p95_ms      — HTTP latency P95
+#   http_p99_ms      — HTTP latency P99
+#   http_p999_ms     — HTTP latency P99.9
+#   http_max_ms      — maximum HTTP latency (Gil Tene: never hide the max)
+#   dns_ms           — average DNS latency
+#   stability_ratio  — p99/p50 ratio (e.g. 5 means p99 <= 5× p50)
+#   icmp_ms          — average ICMP (network) latency
+#   icmp_jitter_ms   — ICMP jitter (standard deviation of RTTs)
+#   icmp_loss_pct    — ICMP packet loss in % (e.g. 5 = max 5% loss)
+#   tcp_ms           — average TCP handshake latency
+#   tcp_jitter_ms    — TCP jitter (standard deviation of RTTs)
+#   tls_ms           — average TLS handshake latency
+#   http_keepalive_ms — estimated keep-alive HTTP latency (no TCP/TLS overhead)
+#   nb_hops_max      — maximum hop count (requires --traceroute)
+#   mos_min          — minimum ITU-T G.107 MOS score (higher = better, e.g. 3.6)
+#
+# HTTP validation assertions (key "assert"):
+#   status_code    — expected HTTP status code (e.g. 200)
+#   body_contains  — string expected in the first 4 KB of the response body
+#   header         — "Key: Value" or "Key" (checks for presence)
+
+- url: https://google.com
+  slo:
+    http_p50_ms: 300
+    http_p95_ms: 400
+    dns_ms: 50
+    stability_ratio: 5
+    tls_ms: 80
+    http_max_ms: 500
+  assert:
+    status_code: 200
+    body_contains: "google"
+
+- url: https://youtube.com
+  slo:
+    http_p50_ms: 300
+    http_p95_ms: 600
+    dns_ms: 80
+    icmp_ms: 50
+    icmp_loss_pct: 5
+    mos_min: 3.6      # "acceptable" VoIP quality per ITU-T G.107
+
+- url: https://apple.com
+  # no SLO defined for this site
