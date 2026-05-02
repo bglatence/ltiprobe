@@ -875,7 +875,6 @@ def test_mesurer_traceroute_detail_hote_invalide():
 
 def _csv_avec_histogramme(path, url, valeurs_ms):
     """Crée un CSV minimal avec hdr_encode pour les valeurs données (en ms)."""
-    from hdrh.histogram import HdrHistogram
     hist = creer_histogramme()
     for v in valeurs_ms:
         hist.record_value(int(v * 1000))
