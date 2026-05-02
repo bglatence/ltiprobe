@@ -5,10 +5,12 @@ import yaml
 FICHIER_DEFAUT = "ltiprobe.yaml"
 
 _DEFAULTS = {
-    "nb_mesures": 10,
-    "timeout":    10,
-    "langue":     "FR",
-    "verbosity":  "full",
+    "nb_mesures":           10,
+    "timeout":              10,
+    "langue":               "FR",
+    "verbosity":            "full",
+    "nb_ressources_par_page": None,  # Q : estimateur compound latency
+    "requetes_par_heure":   None,    # R : traduction percentiles → users/h
     "sites": [
         {"url": "https://google.com"},
         {"url": "https://github.com"},
