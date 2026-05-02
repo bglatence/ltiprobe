@@ -78,8 +78,12 @@ def parse_arguments():
         help="Sites to measure (e.g. https://google.com https://github.com)"
     )
     parser.add_argument(
-        "-n", "--nombre", type=int, default=cfg["nb_mesures"],
+        "-n", "--nombre", type=int, default=cfg["nb_measures"],
         help="Number of measurements per site (default: %(default)s)"
+    )
+    parser.add_argument(
+        "--sites-file", default=None, metavar="FILE",
+        help=f"YAML file containing the list of sites to measure (default: {config.FICHIER_SITES_DEFAUT})"
     )
     parser.add_argument("--csv", action="store_true",
         help="Save results to a CSV file")
@@ -826,7 +830,7 @@ def main():
         print("Erreur : " + str(e), file=sys.stderr)
         sys.exit(1)
 
-    t = get_translator(cfg.get("langue", "FR").upper())
+    t = get_translator(cfg.get("language", "FR").upper())
     verify_tls = not args.no_verify_tls
 
     if args.merge:
@@ -842,13 +846,25 @@ def main():
             print(str(e), file=sys.stderr)
             sys.exit(1)
 
+    # Sites loading priority:
+    # 1. CLI positional args  (ltiprobe https://example.com)
+    # 2. --sites-file FILE    (explicit override)
+    # 3. sites.yaml           (auto-detected if present)
+    # 4. ltiprobe.yaml sites: (backward compatibility)
     if args.sites:
         sites_config = [{"url": s} for s in args.sites]
     else:
-        sites_config = [
-            s if isinstance(s, dict) else {"url": s}
-            for s in cfg["sites"]
-        ]
+        try:
+            sites_config = config.charger_sites(args.sites_file)
+        except (FileNotFoundError, ValueError) as e:
+            print(str(e), file=sys.stderr)
+            sys.exit(1)
+        if not sites_config:
+            # fallback: sites: key in ltiprobe.yaml
+            sites_config = [
+                s if isinstance(s, dict) else {"url": s}
+                for s in cfg.get("sites", [])
+            ]
 
     cfg_file = args.config_file or config.FICHIER_DEFAUT
     print(t("header", ver=__version__, n=args.nombre, cfg=cfg_file) + "\n")

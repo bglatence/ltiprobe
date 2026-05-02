@@ -177,24 +177,25 @@ def test_verifier_slo_vide():
     assert checks == {}
 
 def test_config_yaml(tmp_path):
-    """Le chargeur YAML doit lire nb_mesures et les sites correctement."""
-    yaml_content = (
-        "nb_mesures: 5\n"
-        "timeout: 3\n"
-        "sites:\n"
-        "  - url: https://example.com\n"
-        "    slo:\n"
-        "      http_p50_ms: 100\n"
-    )
+    """config.charger() doit lire nb_measures et timeout correctement."""
+    from ltiprobe import config as _config
+    yaml_content = "nb_measures: 5\ntimeout: 3\nlanguage: EN\n"
     config_file = tmp_path / "ltiprobe.yaml"
     config_file.write_text(yaml_content, encoding="utf-8")
-
-    import yaml
-    data = yaml.safe_load(config_file.read_text())
-    assert data["nb_mesures"] == 5
+    data = _config.charger(str(config_file))
+    assert data["nb_measures"] == 5
     assert data["timeout"] == 3
-    assert data["sites"][0]["url"] == "https://example.com"
-    assert data["sites"][0]["slo"]["http_p50_ms"] == 100
+    assert data["language"] == "EN"
+
+def test_config_yaml_backward_compat(tmp_path):
+    """config.charger() doit accepter les anciennes clés nb_mesures et langue."""
+    from ltiprobe import config as _config
+    yaml_content = "nb_mesures: 7\nlangue: FR\n"
+    config_file = tmp_path / "ltiprobe.yaml"
+    config_file.write_text(yaml_content, encoding="utf-8")
+    data = _config.charger(str(config_file))
+    assert data["nb_measures"] == 7
+    assert data["language"] == "FR"
 
 _CLES_SLO_VALIDES = {
     "http_p50_ms", "http_p75_ms", "http_p90_ms",
@@ -205,50 +206,78 @@ _CLES_SLO_VALIDES = {
 }
 
 def test_ltiprobe_yaml_existe():
-    """Le fichier ltiprobe.yaml doit exister à la racine du projet."""
-    assert os.path.exists("ltiprobe.yaml"), "ltiprobe.yaml introuvable à la racine"
+    """ltiprobe.yaml must exist at the project root."""
+    assert os.path.exists("ltiprobe.yaml"), "ltiprobe.yaml not found at project root"
 
 def test_ltiprobe_yaml_structure():
-    """ltiprobe.yaml doit avoir les clés obligatoires avec les bons types."""
-    import yaml
-    with open("ltiprobe.yaml", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+    """ltiprobe.yaml must contain the required tool-config keys with correct types."""
+    from ltiprobe import config as _config
+    data = _config.charger("ltiprobe.yaml")
+    assert isinstance(data.get("nb_measures"), int), "nb_measures must be an integer"
+    assert data["nb_measures"] > 0, "nb_measures must be > 0"
+    assert isinstance(data.get("timeout"), int), "timeout must be an integer"
+    assert data["timeout"] > 0, "timeout must be > 0"
+    assert isinstance(data.get("language"), str), "language must be a string"
 
-    assert isinstance(data.get("nb_mesures"), int), "nb_mesures doit être un entier"
-    assert data["nb_mesures"] > 0, "nb_mesures doit être > 0"
-    assert isinstance(data.get("timeout"), int), "timeout doit être un entier"
-    assert data["timeout"] > 0, "timeout doit être > 0"
-    assert isinstance(data.get("sites"), list), "sites doit être une liste"
-    assert len(data["sites"]) > 0, "sites ne doit pas être vide"
+def test_sites_yaml_existe():
+    """sites.yaml must exist at the project root."""
+    assert os.path.exists("sites.yaml"), "sites.yaml not found at project root"
 
-def test_ltiprobe_yaml_sites():
-    """Chaque site dans ltiprobe.yaml doit avoir une URL valide."""
-    import yaml
-    with open("ltiprobe.yaml", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-
-    for site in data["sites"]:
-        assert "url" in site, f"Site sans clé 'url' : {site}"
+def test_sites_yaml_structure():
+    """sites.yaml must be a non-empty list of dicts with valid URLs."""
+    from ltiprobe import config as _config
+    sites = _config.charger_sites("sites.yaml")
+    assert isinstance(sites, list), "sites.yaml must be a YAML list"
+    assert len(sites) > 0, "sites.yaml must not be empty"
+    for site in sites:
+        assert "url" in site, f"Entry missing 'url' key: {site}"
         url = site["url"]
         assert url.startswith("http://") or url.startswith("https://"), \
-            f"URL invalide (doit commencer par http:// ou https://) : {url}"
+            f"Invalid URL (must start with http:// or https://): {url}"
 
-def test_ltiprobe_yaml_slo_cles():
-    """Les clés SLO dans ltiprobe.yaml doivent être reconnues par verifier_slo."""
-    import yaml
-    with open("ltiprobe.yaml", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-
-    for site in data["sites"]:
+def test_sites_yaml_slo_cles():
+    """SLO keys in sites.yaml must be recognised by verifier_slo."""
+    from ltiprobe import config as _config
+    sites = _config.charger_sites("sites.yaml")
+    for site in sites:
         slo = site.get("slo")
         if not slo:
             continue
-        cles_inconnues = set(slo.keys()) - _CLES_SLO_VALIDES
-        assert not cles_inconnues, \
-            f"Clés SLO inconnues pour {site['url']} : {cles_inconnues}"
-        for cle, valeur in slo.items():
-            assert isinstance(valeur, (int, float)) and valeur > 0, \
-                f"Seuil SLO invalide pour {site['url']}.{cle} : {valeur}"
+        unknown = set(slo.keys()) - _CLES_SLO_VALIDES
+        assert not unknown, f"Unknown SLO keys for {site['url']}: {unknown}"
+        for key, value in slo.items():
+            assert isinstance(value, (int, float)) and value > 0, \
+                f"Invalid SLO threshold for {site['url']}.{key}: {value}"
+
+def test_charger_sites_liste_directe(tmp_path):
+    """charger_sites() must parse a direct YAML list."""
+    from ltiprobe import config as _config
+    f = tmp_path / "sites.yaml"
+    f.write_text("- url: https://example.com\n- url: https://test.com\n", encoding="utf-8")
+    sites = _config.charger_sites(str(f))
+    assert len(sites) == 2
+    assert sites[0]["url"] == "https://example.com"
+
+def test_charger_sites_fichier_absent():
+    """charger_sites() with no explicit path returns [] if sites.yaml is absent."""
+    from ltiprobe import config as _config
+    import unittest.mock as mock
+    with mock.patch("os.path.exists", return_value=False):
+        assert _config.charger_sites() == []
+
+def test_charger_sites_fichier_explicite_absent(tmp_path):
+    """charger_sites() raises FileNotFoundError for an explicit missing file."""
+    from ltiprobe import config as _config
+    with pytest.raises(FileNotFoundError):
+        _config.charger_sites(str(tmp_path / "inexistant.yaml"))
+
+def test_charger_sites_format_invalide(tmp_path):
+    """charger_sites() raises ValueError if the file is not a YAML list."""
+    from ltiprobe import config as _config
+    f = tmp_path / "bad.yaml"
+    f.write_text("sites:\n  - url: https://example.com\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        _config.charger_sites(str(f))
 
 def test_calculer_mos_excellent():
     """Conditions idéales → MOS ≥ 4.3 (excellente)."""
