@@ -794,3 +794,139 @@ Utilisez `mos_min` dans votre SLO pour imposer un seuil de qualité minimum.
 ### Licence
 
 MIT
+
+---
+
+## Résumés multilingues
+
+> Descriptions concises dans chaque langue supportée. Pour la documentation complète, consultez les sections anglaise ou française ci-dessus.
+
+---
+
+### Español
+
+**ltiprobe** es una herramienta de línea de comandos para medir la latencia HTTP, DNS, ICMP, TCP y TLS de sitios web desde el terminal.
+
+**Funciones principales**
+
+- Distribución de latencia completa (P50 → P99.9) mediante histogramas HDR
+- Comparación de protocolos por capas: ICMP (red) / TCP (transporte) / TLS (sesión) / HTTP (aplicación)
+- Validación de SLO (objetivos de nivel de servicio) con alertas configurables
+- Detección de CDN y estado de caché
+- Traceroute salto a salto con jitter y pérdida de paquetes por salto (`--traceroute-detail`)
+- Descubrimiento del Path MTU efectivo (`--path-mtu`)
+- Puntuación de calidad vocal ITU-T G.107 (E-Model, MOS)
+- Exportación Prometheus y alertas webhook (Slack, Teams, PagerDuty)
+- Fusión de histogramas HDR de múltiples exportaciones CSV (`--merge`)
+- Monitoreo continuo con detección de degradación (`--interval`)
+
+```bash
+pip install ltiprobe
+ltiprobe --help
+```
+
+Configuración: cree un archivo `ltiprobe.yaml` con `langue: ES` para activar la interfaz en español.
+
+---
+
+### Deutsch
+
+**ltiprobe** ist ein Kommandozeilenwerkzeug zur Messung der HTTP-, DNS-, ICMP-, TCP- und TLS-Latenz von Websites direkt im Terminal.
+
+**Hauptfunktionen**
+
+- Vollständige Latenzverteilung (P50 → P99.9) mit HDR-Histogrammen
+- Protokollvergleich nach Schichten: ICMP (Netz) / TCP (Transport) / TLS (Sitzung) / HTTP (Anwendung)
+- SLO-Validierung (Service Level Objectives) mit konfigurierbaren Schwellenwerten
+- CDN-Erkennung und Cache-Status
+- Hop-by-Hop-Traceroute mit Jitter und Paketverlust pro Hop (`--traceroute-detail`)
+- Ermittlung des effektiven Path MTU (`--path-mtu`)
+- Sprachqualitätsbewertung nach ITU-T G.107 (E-Modell, MOS)
+- Prometheus-Export und Webhook-Benachrichtigungen (Slack, Teams, PagerDuty)
+- Zusammenführung von HDR-Histogrammen aus mehreren CSV-Exporten (`--merge`)
+- Kontinuierliches Monitoring mit Degradierungserkennung (`--interval`)
+
+```bash
+pip install ltiprobe
+ltiprobe --help
+```
+
+Konfiguration: erstellen Sie eine Datei `ltiprobe.yaml` mit `langue: DE`, um die deutsche Oberfläche zu aktivieren.
+
+---
+
+### 日本語
+
+**ltiprobe** は、ウェブサイトの HTTP・DNS・ICMP・TCP・TLS レイテンシをターミナルから計測するコマンドラインツールです。
+
+**主な機能**
+
+- HDR ヒストグラムによる完全なレイテンシ分布（P50 〜 P99.9）
+- プロトコル層別比較：ICMP（ネットワーク層）/ TCP（トランスポート層）/ TLS（セッション層）/ HTTP（アプリケーション層）
+- SLO（サービスレベル目標）の検証とアラート設定
+- CDN 検出とキャッシュ状態の表示
+- ホップごとのジッターとパケットロスを含む詳細トレースルート（`--traceroute-detail`）
+- 有効な Path MTU の探索（`--path-mtu`）
+- ITU-T G.107 E-Model に基づく音声品質スコアリング（MOS）
+- Prometheus エクスポートおよび Webhook アラート（Slack・Teams・PagerDuty）
+- 複数 CSV エクスポートの HDR ヒストグラム結合（`--merge`）
+- 劣化検知を含む継続監視（`--interval`）
+
+```bash
+pip install ltiprobe
+ltiprobe --help
+```
+
+設定：`ltiprobe.yaml` に `langue: JA` を記述すると日本語インターフェースが有効になります。
+
+---
+
+### 中文（简体）
+
+**ltiprobe** 是一款命令行工具，可在终端直接测量网站的 HTTP、DNS、ICMP、TCP 和 TLS 延迟。
+
+**主要功能**
+
+- 基于 HDR 直方图的完整延迟分布（P50 至 P99.9）
+- 按协议层对比：ICMP（网络层）/ TCP（传输层）/ TLS（会话层）/ HTTP（应用层）
+- SLO（服务级别目标）验证与可配置告警
+- CDN 检测与缓存状态显示
+- 逐跳路由追踪，包含每跳的抖动和丢包率（`--traceroute-detail`）
+- 有效 Path MTU 发现（`--path-mtu`）
+- 基于 ITU-T G.107 E-Model 的语音质量评分（MOS）
+- Prometheus 导出与 Webhook 告警（Slack、Teams、PagerDuty）
+- 合并多个 CSV 导出的 HDR 直方图（`--merge`）
+- 带劣化检测的持续监控（`--interval`）
+
+```bash
+pip install ltiprobe
+ltiprobe --help
+```
+
+配置：在 `ltiprobe.yaml` 中设置 `langue: ZH` 即可启用中文界面。
+
+---
+
+### Português (Brasil)
+
+**ltiprobe** é uma ferramenta de linha de comando para medir a latência HTTP, DNS, ICMP, TCP e TLS de sites diretamente no terminal.
+
+**Principais funcionalidades**
+
+- Distribuição completa de latência (P50 → P99.9) com histogramas HDR
+- Comparação de protocolos por camadas: ICMP (rede) / TCP (transporte) / TLS (sessão) / HTTP (aplicação)
+- Validação de SLO (objetivos de nível de serviço) com alertas configuráveis
+- Detecção de CDN e status de cache
+- Traceroute salto a salto com jitter e perda de pacotes por salto (`--traceroute-detail`)
+- Descoberta do Path MTU efetivo (`--path-mtu`)
+- Pontuação de qualidade vocal ITU-T G.107 (E-Model, MOS)
+- Exportação Prometheus e alertas webhook (Slack, Teams, PagerDuty)
+- Fusão de histogramas HDR de múltiplos exports CSV (`--merge`)
+- Monitoramento contínuo com detecção de degradação (`--interval`)
+
+```bash
+pip install ltiprobe
+ltiprobe --help
+```
+
+Configuração: crie um arquivo `ltiprobe.yaml` com `langue: PT` para ativar a interface em português.
