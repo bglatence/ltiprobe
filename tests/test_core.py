@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import pytest
-from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, calculer_mos, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls, mesurer_dns_ttl, detecter_reseau, lister_interfaces, decouvrir_path_mtu, mesurer_traceroute_detail
+from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, calculer_mos, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls, mesurer_dns_ttl, detecter_reseau, lister_interfaces, decouvrir_path_mtu, mesurer_traceroute_detail, merger_histogrammes
 from ltiprobe.i18n import get_translator
 
 
@@ -869,3 +869,78 @@ def test_mesurer_traceroute_detail_hote_invalide():
         pytest.skip("non disponible sur Windows")
     result = mesurer_traceroute_detail("hote-invalide-xyz-123.invalid", nb_sondages=2, timeout=1)
     assert result is None or isinstance(result, dict)
+
+
+# ── merger_histogrammes ───────────────────────────────────────────────────────
+
+def _csv_avec_histogramme(path, url, valeurs_ms):
+    """Crée un CSV minimal avec hdr_encode pour les valeurs données (en ms)."""
+    from hdrh.histogram import HdrHistogram
+    hist = creer_histogramme()
+    for v in valeurs_ms:
+        hist.record_value(int(v * 1000))
+    encoded = hist.encode()
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write("url,p50,p99,hdr_encode\n")
+        f.write(f'"{url}",0,0,"{repr(encoded)}"\n')
+
+
+def test_merger_histogrammes_structure(tmp_path):
+    """merger_histogrammes doit retourner un dict avec les bonnes clés."""
+    f1 = tmp_path / "a.csv"
+    _csv_avec_histogramme(str(f1), "https://example.com", [50, 60, 70])
+    result = merger_histogrammes([str(f1)])
+    assert result is not None
+    assert "https://example.com" in result
+    data = result["https://example.com"]
+    assert "sources" in data
+    assert "merged" in data
+    assert "nb_total" in data
+    assert data["nb_total"] == 3
+
+
+def test_merger_histogrammes_deux_fichiers(tmp_path):
+    """Deux fichiers CSV pour le même URL doivent être fusionnés correctement."""
+    f1 = tmp_path / "a.csv"
+    f2 = tmp_path / "b.csv"
+    _csv_avec_histogramme(str(f1), "https://example.com", [50] * 100)
+    _csv_avec_histogramme(str(f2), "https://example.com", [100] * 100)
+    result = merger_histogrammes([str(f1), str(f2)])
+    assert result is not None
+    data = result["https://example.com"]
+    assert data["nb_total"] == 200
+    assert len(data["sources"]) == 2
+    merged = data["merged"]
+    assert merged["p50"] is not None
+    assert merged["p99"] is not None
+
+
+def test_merger_histogrammes_plusieurs_urls(tmp_path):
+    """Deux URLs distincts dans les fichiers produisent deux entrées dans le résultat."""
+    f1 = tmp_path / "a.csv"
+    f2 = tmp_path / "b.csv"
+    _csv_avec_histogramme(str(f1), "https://alpha.com", [30, 40])
+    _csv_avec_histogramme(str(f2), "https://beta.com", [80, 90])
+    result = merger_histogrammes([str(f1), str(f2)])
+    assert result is not None
+    assert "https://alpha.com" in result
+    assert "https://beta.com" in result
+
+
+def test_merger_histogrammes_fichier_absent(tmp_path):
+    """Un fichier inexistant est ignoré sans lever d'exception."""
+    f1 = tmp_path / "real.csv"
+    _csv_avec_histogramme(str(f1), "https://example.com", [50])
+    result = merger_histogrammes([str(f1), str(tmp_path / "inexistant.csv")])
+    assert result is not None
+    assert "https://example.com" in result
+
+
+def test_merger_histogrammes_sans_hdr_encode(tmp_path):
+    """Un CSV sans colonne hdr_encode retourne None."""
+    f1 = tmp_path / "no_hist.csv"
+    with open(str(f1), "w", encoding="utf-8") as f:
+        f.write("url,p50,p99\n")
+        f.write("https://example.com,50,100\n")
+    result = merger_histogrammes([str(f1)])
+    assert result is None

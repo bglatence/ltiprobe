@@ -1216,3 +1216,54 @@ def sauvegarder_csv_comparaison(resultats, fichier=None):
                     row[f"{cle_csv}_statut"]    = ""
             writer.writerow(row)
     return nom
+
+def merger_histogrammes(fichiers_csv):
+    """Fusionne plusieurs CSV de résultats en additionnant les histogrammes HDR.
+
+    Retourne {url: {sources, merged, nb_total}} ou None si aucune donnée valide.
+    Chaque source : {fichier, nb, moyenne, p50, p99}.
+    """
+    import csv as _csv
+    import ast
+    par_url: dict = {}
+    for fichier in fichiers_csv:
+        try:
+            with open(fichier, newline="", encoding="utf-8") as f:
+                for row in _csv.DictReader(f):
+                    url = row.get("url", "").strip()
+                    enc = row.get("hdr_encode", "").strip()
+                    if url and enc:
+                        par_url.setdefault(url, []).append(
+                            {"fichier": fichier, "enc": enc}
+                        )
+        except Exception:
+            continue
+    if not par_url:
+        return None
+    resultats = {}
+    for url, sources in par_url.items():
+        hist_merge = creer_histogramme()
+        infos: list = []
+        for s in sources:
+            try:
+                encoded_bytes = ast.literal_eval(s["enc"])
+                hist_src = HdrHistogram.decode(encoded_bytes)
+                stats_src = hdr_stats(hist_src)
+                hist_merge.add(hist_src)
+                infos.append({
+                    "fichier": s["fichier"],
+                    "nb":      hist_src.get_total_count(),
+                    "moyenne": stats_src["moyenne"],
+                    "p50":     stats_src["p50"],
+                    "p99":     stats_src["p99"],
+                })
+            except Exception:
+                continue
+        if not infos or hist_merge.get_total_count() == 0:
+            continue
+        resultats[url] = {
+            "sources":  infos,
+            "merged":   hdr_stats(hist_merge),
+            "nb_total": hist_merge.get_total_count(),
+        }
+    return resultats or None
