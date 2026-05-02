@@ -1,9 +1,30 @@
 # -*- coding: utf-8 -*-
+"""
+Unit tests — no real network calls, runs in ~3 s.
+
+All tests here use only pure logic, tmp_path fixtures, or mocked network calls.
+Run with:  pytest tests/test_unit.py
+"""
 import os
 import pytest
-from ltiprobe.core import mesurer_site, sauvegarder_csv, sauvegarder_prometheus, envoyer_webhook, calculer_mos, creer_histogramme, hdr_enregistrer, hdr_stats, verifier_slo, verifier_assertions, charger_baseline, comparer_baseline, sauvegarder_csv_comparaison, inspecter_tls, mesurer_dns_ttl, detecter_reseau, lister_interfaces, decouvrir_path_mtu, mesurer_traceroute_detail, merger_histogrammes
+from ltiprobe.core import (
+    sauvegarder_csv,
+    sauvegarder_prometheus,
+    envoyer_webhook,
+    calculer_mos,
+    creer_histogramme,
+    hdr_enregistrer,
+    hdr_stats,
+    verifier_slo,
+    charger_baseline,
+    comparer_baseline,
+    sauvegarder_csv_comparaison,
+    merger_histogrammes,
+)
 from ltiprobe.i18n import get_translator
 
+
+# ── i18n ──────────────────────────────────────────────────────────────────────
 
 def test_i18n_fr_header():
     """Le traducteur FR doit produire un message en français."""
@@ -52,36 +73,8 @@ def test_i18n_cles_identiques():
     for lang in ("EN", "ES", "DE", "JA", "ZH", "PT"):
         assert cles_fr == set(_TRANSLATIONS[lang].keys()), f"Clés manquantes ou en trop pour {lang}"
 
-def test_verifier_assertions_status_ok():
-    """Un site retournant 200 doit valider status_code: 200."""
-    checks = verifier_assertions("https://google.com", {"status_code": 200})
-    assert "_erreur" not in checks
-    assert checks["status_code"]["ok"]
 
-def test_verifier_assertions_status_violation():
-    """Un status_code incorrect doit être marqué en violation."""
-    checks = verifier_assertions("https://google.com", {"status_code": 999})
-    assert not checks["status_code"]["ok"]
-
-def test_verifier_assertions_body_contains_ok():
-    """La recherche d'un mot présent dans le body doit réussir."""
-    checks = verifier_assertions("https://google.com", {"body_contains": "google"})
-    assert checks["body_contains"]["ok"]
-
-def test_verifier_assertions_body_contains_violation():
-    """La recherche d'un mot absent doit échouer."""
-    checks = verifier_assertions("https://google.com", {"body_contains": "xyzxyzxyz_absent_xyzxyz"})
-    assert not checks["body_contains"]["ok"]
-
-def test_verifier_assertions_host_invalide():
-    """Un hôte inexistant doit retourner une erreur."""
-    checks = verifier_assertions("https://hote.inexistant.invalid", {"status_code": 200})
-    assert "_erreur" in checks
-
-def test_verifier_assertions_vide():
-    """Des assertions vides doivent retourner un dict vide."""
-    checks = verifier_assertions("https://google.com", {})
-    assert checks == {}
+# ── HDR Histogram ─────────────────────────────────────────────────────────────
 
 def test_hdr_stats_percentiles_croissants():
     """Les percentiles doivent être croissants."""
@@ -131,6 +124,9 @@ def test_hdr_enregistrer_avec_correction_eleve_p99():
         hdr_enregistrer(hist_corr, ms, intervalle_us=intervalle_us)
     assert hdr_stats(hist_corr)["p99"] >= hdr_stats(hist_brut)["p99"]
 
+
+# ── SLO verification ──────────────────────────────────────────────────────────
+
 def test_verifier_slo_respect():
     """Un résultat sous les seuils doit tout marquer OK."""
     resultat = {"p50": 100.0, "p95": 200.0, "dns_moyenne": 10.0}
@@ -176,6 +172,30 @@ def test_verifier_slo_vide():
     checks = verifier_slo({"p50": 100.0}, {})
     assert checks == {}
 
+def test_verifier_slo_mos_min_respect():
+    """mos_min : MOS >= seuil → ok=True, op='>='."""
+    resultat = {"mos": 4.1}
+    checks = verifier_slo(resultat, {"mos_min": 4.0})
+    assert checks["mos_min"]["ok"] is True
+    assert checks["mos_min"]["op"] == ">="
+
+def test_verifier_slo_mos_min_violation():
+    """mos_min : MOS < seuil → ok=False."""
+    resultat = {"mos": 3.5}
+    checks = verifier_slo(resultat, {"mos_min": 4.0})
+    assert checks["mos_min"]["ok"] is False
+    assert checks["mos_min"]["op"] == ">="
+
+def test_verifier_slo_op_field_standard():
+    """Les clés SLO standards doivent avoir op='<='."""
+    resultat = {"p50": 100.0, "dns_moyenne": 30.0}
+    checks = verifier_slo(resultat, {"http_p50_ms": 200, "dns_ms": 50})
+    assert checks["http_p50_ms"]["op"] == "<="
+    assert checks["dns_ms"]["op"] == "<="
+
+
+# ── Config / YAML loading ─────────────────────────────────────────────────────
+
 def test_config_yaml(tmp_path):
     """config.charger() doit lire nb_measures et timeout correctement."""
     from ltiprobe import config as _config
@@ -196,6 +216,7 @@ def test_config_yaml_backward_compat(tmp_path):
     data = _config.charger(str(config_file))
     assert data["nb_measures"] == 7
     assert data["language"] == "FR"
+
 
 _CLES_SLO_VALIDES = {
     "http_p50_ms", "http_p75_ms", "http_p90_ms",
@@ -279,6 +300,9 @@ def test_charger_sites_format_invalide(tmp_path):
     with pytest.raises(ValueError):
         _config.charger_sites(str(f))
 
+
+# ── MOS calculation ───────────────────────────────────────────────────────────
+
 def test_calculer_mos_excellent():
     """Conditions idéales → MOS ≥ 4.3 (excellente)."""
     r = calculer_mos(20.0, 1.0, 0.0)
@@ -286,13 +310,11 @@ def test_calculer_mos_excellent():
     assert r["qualite"] == "excellente"
     assert 80 <= r["r_factor"] <= 100
 
-
 def test_calculer_mos_mauvais():
     """Forte latence + perte → MOS < 3.1 (mauvaise)."""
     r = calculer_mos(400.0, 30.0, 5.0)
     assert r["mos"] < 3.1
     assert r["qualite"] == "mauvaise"
-
 
 def test_calculer_mos_sans_jitter_loss():
     """Sans jitter ni perte, seule la latence dégrade le score."""
@@ -300,14 +322,12 @@ def test_calculer_mos_sans_jitter_loss():
     r_elevee  = calculer_mos(300.0)
     assert r_faible["mos"] > r_elevee["mos"]
 
-
 def test_calculer_mos_plafond():
     """Le MOS ne peut pas dépasser 4.5 ni descendre sous 1.0."""
     r_ideal = calculer_mos(1.0, 0.0, 0.0)
     r_pire  = calculer_mos(5000.0, 500.0, 100.0)
     assert r_ideal["mos"] <= 4.5
     assert r_pire["mos"] >= 1.0
-
 
 def test_calculer_mos_seuils_qualite():
     """Chaque niveau de qualité doit être atteignable."""
@@ -322,29 +342,7 @@ def test_calculer_mos_seuils_qualite():
     assert "mauvaise"   in niveaux
 
 
-def test_verifier_slo_mos_min_respect():
-    """mos_min : MOS >= seuil → ok=True, op='>='."""
-    resultat = {"mos": 4.1}
-    checks = verifier_slo(resultat, {"mos_min": 4.0})
-    assert checks["mos_min"]["ok"] is True
-    assert checks["mos_min"]["op"] == ">="
-
-
-def test_verifier_slo_mos_min_violation():
-    """mos_min : MOS < seuil → ok=False."""
-    resultat = {"mos": 3.5}
-    checks = verifier_slo(resultat, {"mos_min": 4.0})
-    assert checks["mos_min"]["ok"] is False
-    assert checks["mos_min"]["op"] == ">="
-
-
-def test_verifier_slo_op_field_standard():
-    """Les clés SLO standards doivent avoir op='<='."""
-    resultat = {"p50": 100.0, "dns_moyenne": 30.0}
-    checks = verifier_slo(resultat, {"http_p50_ms": 200, "dns_ms": 50})
-    assert checks["http_p50_ms"]["op"] == "<="
-    assert checks["dns_ms"]["op"] == "<="
-
+# ── Jitter ────────────────────────────────────────────────────────────────────
 
 def test_jitter_calcul():
     """_jitter doit calculer l'écart-type correct."""
@@ -353,7 +351,6 @@ def test_jitter_calcul():
     assert _jitter([10.0, 20.0]) == 5.0
     assert _jitter([10.0]) is None
     assert _jitter([]) is None
-
 
 def test_jitter_valeurs_asymetriques():
     """_jitter doit être insensible à l'ordre des valeurs."""
@@ -364,157 +361,7 @@ def test_jitter_valeurs_asymetriques():
     assert j1 > 0
 
 
-def test_mesurer_tcp_valide():
-    """Un hôte accessible doit retourner des RTTs TCP positifs avec jitter."""
-    from ltiprobe.core import mesurer_tcp
-    r = mesurer_tcp("https://google.com", nb_mesures=3)
-    assert r is not None
-    assert r["moyenne"] > 0
-    assert r["min"] <= r["moyenne"] <= r["max"]
-    assert r["nb"] == 3
-    assert r["port"] == 443
-    assert "jitter" in r
-
-def test_mesurer_tcp_invalide():
-    """Un hôte inexistant doit retourner None."""
-    from ltiprobe.core import mesurer_tcp
-    r = mesurer_tcp("https://hote.inexistant.invalid", nb_mesures=1)
-    assert r is None
-
-def test_mesurer_tls_valide():
-    """Un site HTTPS accessible doit retourner des temps de handshake positifs."""
-    from ltiprobe.core import mesurer_tls
-    r = mesurer_tls("https://google.com", nb_mesures=2)
-    assert r is not None
-    assert r["moyenne"] > 0
-    assert r["min"] <= r["moyenne"] <= r["max"]
-    assert r["nb"] == 2
-
-def test_detecter_reseau_structure():
-    """detecter_reseau doit retourner un dict avec les clés attendues."""
-    r = detecter_reseau()
-    assert r is not None
-    assert set(r.keys()) == {"local_ip", "interface", "interfaces", "public_ip", "isp", "as_info", "pays", "pays_code"}
-
-def test_lister_interfaces_retourne_liste():
-    """lister_interfaces doit retourner une liste (vide ou non)."""
-    ifaces = lister_interfaces()
-    assert isinstance(ifaces, list)
-
-def test_lister_interfaces_structure():
-    """Chaque interface doit avoir les clés device, type, actif."""
-    ifaces = lister_interfaces()
-    for iface in ifaces:
-        assert "device" in iface
-        assert "type"   in iface
-        assert "actif"  in iface
-
-def test_lister_interfaces_active_marquee():
-    """L'interface active doit être marquée actif=True, les autres False."""
-    r = detecter_reseau()
-    iface_active = r.get("interface") if r else None
-    if not iface_active:
-        return
-    ifaces = lister_interfaces(iface_active)
-    actives = [i for i in ifaces if i["actif"]]
-    assert len(actives) <= 1
-    if actives:
-        assert actives[0]["device"] == iface_active
-
-def test_detecter_reseau_local_ip():
-    """L'IP locale doit être une adresse IPv4 valide."""
-    import ipaddress
-    r = detecter_reseau()
-    assert r is not None
-    assert r["local_ip"] is not None
-    ipaddress.ip_address(r["local_ip"])  # lève ValueError si invalide
-
-def test_detecter_reseau_public_ip():
-    """L'IP publique doit être présente et différente de l'IP locale."""
-    r = detecter_reseau()
-    assert r is not None
-    assert r["public_ip"] is not None
-    # IP publique différente de locale (sauf cas NAT direct, rare)
-    # On vérifie juste que c'est une IP valide
-    import ipaddress
-    ipaddress.ip_address(r["public_ip"])
-
-def test_mesurer_dns_ttl_valide():
-    """Un hôte accessible doit retourner reseau_ms, cache_ms et ttl_s."""
-    r = mesurer_dns_ttl("google.com")
-    assert r is not None
-    assert r["reseau_ms"] is not None and r["reseau_ms"] > 0
-    assert r["cache_ms"] is not None and r["cache_ms"] >= 0
-    assert r["ttl_s"] is not None and r["ttl_s"] > 0
-    # Le cache OS doit être significativement plus rapide que la résolution réseau
-    assert r["cache_ms"] < r["reseau_ms"]
-
-def test_mesurer_dns_ttl_invalide():
-    """Un hôte inexistant doit retourner None."""
-    r = mesurer_dns_ttl("hote.inexistant.invalid")
-    assert r is None
-
-def test_mesurer_dns_ttl_structure():
-    """Le dict retourné doit contenir exactement les clés attendues."""
-    r = mesurer_dns_ttl("google.com")
-    assert r is not None
-    assert set(r.keys()) == {"reseau_ms", "cache_ms", "ttl_s"}
-
-@pytest.mark.skipif(os.getenv("CI") == "true", reason="traceroute bloqué en CI")
-def test_mesurer_traceroute_valide():
-    """Un hôte accessible doit retourner un nombre de hops positif."""
-    from ltiprobe.core import mesurer_traceroute
-    r = mesurer_traceroute("google.com", max_hops=30)
-    assert r is not None
-    assert r["nb_hops"] > 0
-    assert r["nb_repondus"] >= 0
-    assert r["nb_masques"] >= 0
-    assert r["nb_repondus"] + r["nb_masques"] == r["nb_hops"]
-
-def test_mesurer_traceroute_invalide():
-    """Un hôte inexistant doit retourner None."""
-    from ltiprobe.core import mesurer_traceroute
-    r = mesurer_traceroute("hote.inexistant.invalid", max_hops=3)
-    assert r is None
-
-def test_mesurer_tls_invalide():
-    """Un hôte inexistant doit retourner None."""
-    from ltiprobe.core import mesurer_tls
-    r = mesurer_tls("https://hote.inexistant.invalid", nb_mesures=1)
-    assert r is None
-
-@pytest.mark.skipif(os.getenv("CI") == "true", reason="ICMP bloqué en CI")
-def test_mesurer_icmp_valide():
-    """Un hôte accessible doit retourner des RTTs positifs avec jitter et loss."""
-    from ltiprobe.core import mesurer_icmp
-    r = mesurer_icmp("google.com", nb_mesures=5)
-    assert r is not None
-    assert r["moyenne"] > 0
-    assert r["min"] <= r["moyenne"] <= r["max"]
-    assert r["nb"] == 5
-    assert "jitter" in r
-    assert "loss_pct" in r
-    assert 0.0 <= r["loss_pct"] <= 100.0
-
-def test_mesurer_icmp_invalide():
-    """Un hôte inexistant doit retourner None."""
-    from ltiprobe.core import mesurer_icmp
-    r = mesurer_icmp("hote.inexistant.invalid", nb_mesures=1)
-    assert r is None
-
-def test_verifier_ip_joignable_ok():
-    """Une IP publique accessible sur le port 443 doit être joignable."""
-    from ltiprobe.core import verifier_ip_joignable
-    ok, msg = verifier_ip_joignable("8.8.8.8", 443)
-    assert ok
-    assert msg is None
-
-def test_verifier_ip_joignable_echec():
-    """Une IP non routable doit retourner non joignable rapidement."""
-    from ltiprobe.core import verifier_ip_joignable
-    ok, msg = verifier_ip_joignable("192.168.99.99", 80, timeout=2)
-    assert not ok
-    assert msg is not None
+# ── est_adresse_ip ────────────────────────────────────────────────────────────
 
 def test_est_adresse_ip():
     """est_adresse_ip doit distinguer IP et nom de domaine."""
@@ -524,68 +371,8 @@ def test_est_adresse_ip():
     assert not est_adresse_ip("google.com")
     assert not est_adresse_ip("192.168.x.x")  # invalide
 
-def test_mesurer_site_ip_dns_na():
-    """Un site accédé par IP ne doit pas avoir de mesure DNS."""
-    r = mesurer_site("http://93.184.216.34", nb_mesures=1)
-    # Succès ou erreur réseau selon l'environnement, mais jamais d'erreur DNS
-    if not r["erreur"]:
-        assert r["ip_mode"] is True
-        assert r["dns_moyenne"] is None
 
-def test_detecter_cdn_retourne_dict():
-    """detecter_cdn sur un site accessible doit retourner un dict avec les clés attendues."""
-    from ltiprobe.core import detecter_cdn
-    r = detecter_cdn("https://google.com")
-    assert r is not None
-    for cle in ("cdn", "cache", "age_s", "pop", "via"):
-        assert cle in r, f"Clé manquante : {cle}"
-
-def test_detecter_cdn_invalide():
-    """Un hôte inexistant doit retourner None."""
-    from ltiprobe.core import detecter_cdn
-    r = detecter_cdn("https://hote.inexistant.invalid")
-    assert r is None
-
-def test_detecter_cdn_cloudflare():
-    """Un site derrière Cloudflare doit être détecté."""
-    from ltiprobe.core import detecter_cdn
-    r = detecter_cdn("https://www.cloudflare.com")
-    assert r is not None
-    assert r["cdn"] == "Cloudflare"
-
-
-def test_mesurer_site_valide():
-    """Un site valide doit retourner HTTP, DNS et la distribution complète."""
-    r = mesurer_site("https://google.com", nb_mesures=1)
-    assert not r["erreur"]
-    assert r["moyenne"] > 0
-    assert r["dns_moyenne"] > 0
-    for cle in ["p50", "p75", "p90", "p95", "p99", "p999", "hdr_encode"]:
-        assert cle in r, f"Clé manquante : {cle}"
-
-def test_mesurer_dns_valide():
-    """La resolution DNS d'un site valide doit reussir."""
-    from ltiprobe.core import mesurer_dns
-    ms = mesurer_dns("google.com")
-    assert ms is not None
-    assert ms > 0
-
-def test_mesurer_dns_invalide():
-    """La resolution DNS d'un faux site doit retourner None."""
-    from ltiprobe.core import mesurer_dns
-    ms = mesurer_dns("slkjddslfj.com")
-    assert ms is None
-
-def test_mesurer_site_timeout():
-    """Un timeout tres court doit retourner une erreur."""
-    r = mesurer_site("https://google.com", nb_mesures=1, timeout=0.001)
-    assert r["erreur"]
-    assert r["type_erreur"] in ["timeout", "inconnu", "http"]
-
-def test_mesurer_site_url_malformee():
-    """Une URL malformee doit retourner une erreur."""
-    r = mesurer_site("pas-une-url", nb_mesures=1)
-    assert r["erreur"]
+# ── CSV / Export ──────────────────────────────────────────────────────────────
 
 def test_sauvegarder_csv(tmp_path):
     """Le CSV doit contenir les colonnes de distribution et hdr_encode."""
@@ -642,23 +429,6 @@ def test_envoyer_webhook_payload_json():
         envoyer_webhook("https://example.com/hook", {"url": "https://test.com", "event": "slo_violation"})
     assert appels
     assert appels[0].get_header("Content-type") == "application/json"
-
-
-def test_inspecter_tls_valide():
-    """inspecter_tls() sur un site HTTPS valide doit retourner les clés attendues."""
-    r = inspecter_tls("google.com")
-    assert r is not None
-    for cle in ("version", "cipher", "issuer", "subject", "expire_date", "jours_restants"):
-        assert cle in r, f"Clé manquante : {cle}"
-    assert r["version"] in ("TLSv1.2", "TLSv1.3")
-    assert r["jours_restants"] is not None
-    assert r["jours_restants"] > 0, "Le certificat de google.com ne doit pas être expiré"
-
-
-def test_inspecter_tls_invalide():
-    """inspecter_tls() sur un hôte inexistant doit retourner None."""
-    r = inspecter_tls("hote.inexistant.invalid")
-    assert r is None
 
 
 def test_charger_baseline(tmp_path):
@@ -798,106 +568,6 @@ def test_sauvegarder_csv_comparaison(tmp_path):
     assert "regression" in contenu
     assert "amelioration" in contenu
     assert "2026-04-20" in contenu
-
-
-# ── Path MTU Discovery ────────────────────────────────────────────────────────
-
-def test_decouvrir_path_mtu_structure():
-    """decouvrir_path_mtu() doit retourner un dict avec mtu, sondages, blackhole ou None."""
-    import platform
-    result = decouvrir_path_mtu("8.8.8.8", timeout=1)
-    if platform.system() not in ("Darwin", "Linux"):
-        assert result is None
-        return
-    assert result is not None
-    assert "mtu" in result
-    assert "sondages" in result
-    assert "blackhole" in result
-    assert isinstance(result["sondages"], int)
-    assert result["sondages"] > 0
-
-def test_decouvrir_path_mtu_standard():
-    """Pour une IP publique sans MTU réduit, le MTU doit être >= 576."""
-    import platform
-    if platform.system() not in ("Darwin", "Linux"):
-        pytest.skip("path MTU non disponible sur cette plateforme")
-    result = decouvrir_path_mtu("8.8.8.8", timeout=1)
-    assert result is not None
-    if result.get("blackhole"):
-        pytest.skip("PMTUD blackhole détecté — impossible de valider le MTU")
-    assert result["mtu"] is not None
-    assert result["mtu"] >= 576
-
-def test_decouvrir_path_mtu_hostname_http():
-    """decouvrir_path_mtu() doit accepter les URL avec http:// ou https:// en préfixe."""
-    import platform
-    if platform.system() not in ("Darwin", "Linux"):
-        pytest.skip("path MTU non disponible sur cette plateforme")
-    result = decouvrir_path_mtu("https://8.8.8.8", timeout=1)
-    assert result is not None or True  # accepte None si non joignable
-
-def test_decouvrir_path_mtu_hote_invalide():
-    """Un hôte invalide ne doit pas lever d'exception (None ou blackhole acceptés)."""
-    import platform
-    if platform.system() not in ("Darwin", "Linux"):
-        pytest.skip("path MTU non disponible sur cette plateforme")
-    # Peut retourner None (timeout DNS/mDNS) ou {"mtu": None, "blackhole": True}
-    result = decouvrir_path_mtu("hote-invalide-xyz.local", timeout=1)
-    assert result is None or result.get("blackhole") is True or result.get("mtu") is None
-
-
-# ── Traceroute hop-by-hop ─────────────────────────────────────────────────────
-
-def test_mesurer_traceroute_detail_structure():
-    """mesurer_traceroute_detail() doit retourner la structure attendue ou None."""
-    import platform
-    result = mesurer_traceroute_detail("8.8.8.8", nb_sondages=3, timeout=1)
-    if platform.system() == "Windows":
-        assert result is None
-        return
-    if result is None:
-        pytest.skip("traceroute non disponible dans cet environnement")
-    assert "hops" in result
-    assert "nb_hops" in result
-    assert "destination_atteinte" in result
-    assert isinstance(result["hops"], list)
-    assert len(result["hops"]) > 0
-
-def test_mesurer_traceroute_detail_hop_structure():
-    """Chaque hop doit contenir les champs requis."""
-    import platform
-    if platform.system() == "Windows":
-        pytest.skip("non disponible sur Windows")
-    result = mesurer_traceroute_detail("8.8.8.8", nb_sondages=3, timeout=1)
-    if result is None:
-        pytest.skip("traceroute non disponible dans cet environnement")
-    for h in result["hops"]:
-        assert "hop" in h
-        assert "silencieux" in h
-        assert "loss_pct" in h
-        assert "atteint" in h
-        if not h["silencieux"]:
-            assert h["moyenne"] is not None
-            assert h["jitter"] is not None
-            assert 0.0 <= h["loss_pct"] <= 100
-
-def test_mesurer_traceroute_detail_destination():
-    """La destination 8.8.8.8 doit être atteinte."""
-    import platform
-    if platform.system() == "Windows":
-        pytest.skip("non disponible sur Windows")
-    result = mesurer_traceroute_detail("8.8.8.8", nb_sondages=3, timeout=1)
-    if result is None:
-        pytest.skip("traceroute non disponible dans cet environnement")
-    assert result["destination_atteinte"] is True
-
-def test_mesurer_traceroute_detail_hote_invalide():
-    """Un hôte invalide ne doit pas lever d'exception."""
-    import platform
-    if platform.system() == "Windows":
-        pytest.skip("non disponible sur Windows")
-    result = mesurer_traceroute_detail("hote-invalide-xyz-123.invalid", nb_sondages=2, timeout=1)
-    assert result is None or isinstance(result, dict)
 
 
 # ── merger_histogrammes ───────────────────────────────────────────────────────
@@ -1051,5 +721,3 @@ def test_impact_users_p999():
     pct = 99.9
     n_aff = max(1, round((100.0 - pct) / 100.0 * req))
     assert n_aff == 10
-
-
