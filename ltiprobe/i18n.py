@@ -125,6 +125,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "trdetail_non_atteint": "  ✗ destination non atteinte ({n} hops max)",
         "trdetail_alerte_jitter": "  ⚠ jitter",
         "trdetail_alerte_loss":   "  ⚠ loss",
+        "merge_titre":   "\n── Merge de {n} fichier(s) ─────────────────────────────",
+        "merge_source":  "  {f:<40}  ({nb} mesures)   p50: {p50} ms   p99: {p99} ms",
+        "merge_global":  "  Global ({nb} mesures)   p50: {p50} ms   p99: {p99} ms",
+        "merge_na":      "Aucun résultat à fusionner",
     },
     "EN": {
         "header":           "ltiprobe ({ver}):\n\n* measuring response times of web sites ({n} attempts)\n* using config file: {cfg}",
@@ -251,6 +255,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "trdetail_non_atteint": "  ✗ destination not reached ({n} hops max)",
         "trdetail_alerte_jitter": "  ⚠ jitter",
         "trdetail_alerte_loss":   "  ⚠ loss",
+        "merge_titre":   "\n── Merge of {n} file(s) ─────────────────────────────────",
+        "merge_source":  "  {f:<40}  ({nb} measurements)   p50: {p50} ms   p99: {p99} ms",
+        "merge_global":  "  Global ({nb} measurements)   p50: {p50} ms   p99: {p99} ms",
+        "merge_na":      "No results to merge",
     },
     "ES": {
         "header":           "ltiprobe ({ver}):\n\n* midiendo tiempos de respuesta de sitios web ({n} intentos)\n* usando el archivo de configuración: {cfg}",
@@ -377,6 +385,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "trdetail_non_atteint": "  ✗ destino no alcanzado ({n} saltos máx.)",
         "trdetail_alerte_jitter": "  ⚠ jitter",
         "trdetail_alerte_loss":   "  ⚠ pérdida",
+        "merge_titre":   "\n── Merge de {n} archivo(s) ──────────────────────────────",
+        "merge_source":  "  {f:<40}  ({nb} mediciones)   p50: {p50} ms   p99: {p99} ms",
+        "merge_global":  "  Global ({nb} mediciones)   p50: {p50} ms   p99: {p99} ms",
+        "merge_na":      "No hay resultados para fusionar",
     },
     "DE": {
         "header":           "ltiprobe ({ver}):\n\n* Messung der Antwortzeiten von Webseiten ({n} Versuche)\n* Konfigurationsdatei: {cfg}",
@@ -503,6 +515,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "trdetail_non_atteint": "  ✗ Ziel nicht erreicht ({n} Hops max.)",
         "trdetail_alerte_jitter": "  ⚠ Jitter",
         "trdetail_alerte_loss":   "  ⚠ Verlust",
+        "merge_titre":   "\n── Merge von {n} Datei(en) ──────────────────────────────",
+        "merge_source":  "  {f:<40}  ({nb} Messungen)   p50: {p50} ms   p99: {p99} ms",
+        "merge_global":  "  Gesamt ({nb} Messungen)   p50: {p50} ms   p99: {p99} ms",
+        "merge_na":      "Keine Ergebnisse zum Zusammenführen",
     },
     "JA": {
         "header":           "ltiprobe ({ver}):\n\n* ウェブサイトの応答時間を測定中 ({n} 回)\n* 設定ファイル: {cfg}",
@@ -629,6 +645,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "trdetail_non_atteint": "  ✗ 宛先未到達 ({n} ホップ上限)",
         "trdetail_alerte_jitter": "  ⚠ ジッター",
         "trdetail_alerte_loss":   "  ⚠ パケットロス",
+        "merge_titre":   "\n── {n} ファイルのマージ ─────────────────────────────────",
+        "merge_source":  "  {f:<40}  ({nb} 測定)   p50: {p50} ms   p99: {p99} ms",
+        "merge_global":  "  全体 ({nb} 測定)   p50: {p50} ms   p99: {p99} ms",
+        "merge_na":      "マージする結果がありません",
     },
     "ZH": {
         "header":           "ltiprobe ({ver}):\n\n* 正在测量网站响应时间 ({n} 次)\n* 配置文件: {cfg}",
@@ -755,6 +775,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "trdetail_non_atteint": "  ✗ 未到达目标 ({n} 跳上限)",
         "trdetail_alerte_jitter": "  ⚠ 抖动",
         "trdetail_alerte_loss":   "  ⚠ 丢包",
+        "merge_titre":   "\n── 合并 {n} 个文件 ───────────────────────────────────────",
+        "merge_source":  "  {f:<40}  ({nb} 次测量)   p50: {p50} ms   p99: {p99} ms",
+        "merge_global":  "  全局 ({nb} 次测量)   p50: {p50} ms   p99: {p99} ms",
+        "merge_na":      "没有可合并的结果",
     },
     "PT": {
         "header":           "ltiprobe ({ver}):\n\n* medindo tempos de resposta de sites ({n} tentativas)\n* arquivo de configuração: {cfg}",
@@ -881,6 +905,10 @@ _TRANSLATIONS: dict[str, dict[str, str]] = {
         "trdetail_non_atteint": "  ✗ destino não alcançado ({n} saltos máx.)",
         "trdetail_alerte_jitter": "  ⚠ jitter",
         "trdetail_alerte_loss":   "  ⚠ perda",
+        "merge_titre":   "\n── Merge de {n} arquivo(s) ──────────────────────────────",
+        "merge_source":  "  {f:<40}  ({nb} medições)   p50: {p50} ms   p99: {p99} ms",
+        "merge_global":  "  Global ({nb} medições)   p50: {p50} ms   p99: {p99} ms",
+        "merge_na":      "Nenhum resultado para mesclar",
     },
 }
 

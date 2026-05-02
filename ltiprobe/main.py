@@ -15,7 +15,7 @@ from ltiprobe.core import (
     detecter_cdn, est_adresse_ip, verifier_ip_joignable,
     charger_baseline, comparer_baseline, sauvegarder_csv_comparaison,
     calculer_mos, mesurer_dns_ttl, detecter_reseau, decouvrir_path_mtu,
-    mesurer_traceroute_detail,
+    mesurer_traceroute_detail, merger_histogrammes,
     SLO_UNITES, _SEUIL_EXPIRY_ALERTE,
 )
 
@@ -113,6 +113,10 @@ def parse_arguments():
         help="Decouvrir le Path MTU vers chaque site (recherche binaire via ping -D / -M do)")
     parser.add_argument("--traceroute-detail", action="store_true",
         help="Analyse hop-by-hop avec jitter et loss par saut (5 sondages/hop, implique --traceroute)")
+    parser.add_argument(
+        "--merge", nargs="+", metavar="FICHIER",
+        help="Fusionner plusieurs fichiers CSV ltiprobe et afficher les statistiques HDR combinées"
+    )
     return parser.parse_args(), cfg
 
 # ── Indicateurs colorés ───────────────────────────────────────────────────────
@@ -381,6 +385,22 @@ def afficher_path_mtu(pmtu):
         qualite = t("path_mtu_minimal")
     print(couleur + t("path_mtu_valeur", v=mtu, qualite=qualite) + RESET)
     print(t("path_mtu_sondages", n=pmtu["sondages"]))
+
+def afficher_merge(resultats):
+    import os
+    if not resultats:
+        print(t("merge_na"))
+        return
+    for url, data in resultats.items():
+        sources = data["sources"]
+        merged  = data["merged"]
+        print(t("merge_titre", n=len(sources)))
+        print(f"  {url}")
+        for s in sources:
+            fname = os.path.basename(s["fichier"])
+            print(t("merge_source", f=fname, nb=s["nb"], p50=_fmt_ms(s["p50"]), p99=_fmt_ms(s["p99"])))
+        print("  " + "─" * 60)
+        print(t("merge_global", nb=data["nb_total"], p50=_fmt_ms(merged["p50"]), p99=_fmt_ms(merged["p99"])))
 
 def afficher_assertions(assert_checks):
     if not assert_checks:
@@ -755,6 +775,11 @@ def main():
 
     t = get_translator(cfg.get("langue", "FR").upper())
     verify_tls = not args.no_verify_tls
+
+    if args.merge:
+        resultats = merger_histogrammes(args.merge)
+        afficher_merge(resultats)
+        return
 
     baseline = {}
     if args.baseline:
