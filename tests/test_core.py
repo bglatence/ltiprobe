@@ -40,15 +40,17 @@ def test_i18n_zh_header():
     t = get_translator("ZH")
     assert "测量" in t("header", ver="0.3.0", n=5, cfg="ltiprobe.yaml")
 
+def test_i18n_pt_header():
+    """Le traducteur PT doit produire un message en portugais brésilien."""
+    t = get_translator("PT")
+    assert "tentativas" in t("header", ver="0.3.0", n=5, cfg="ltiprobe.yaml")
+
 def test_i18n_cles_identiques():
-    """FR, EN, ES, DE, JA et ZH doivent avoir exactement les mêmes clés."""
+    """Toutes les langues doivent avoir exactement les mêmes clés."""
     from ltiprobe.i18n import _TRANSLATIONS
     cles_fr = set(_TRANSLATIONS["FR"].keys())
-    assert cles_fr == set(_TRANSLATIONS["EN"].keys())
-    assert cles_fr == set(_TRANSLATIONS["ES"].keys())
-    assert cles_fr == set(_TRANSLATIONS["DE"].keys())
-    assert cles_fr == set(_TRANSLATIONS["JA"].keys())
-    assert cles_fr == set(_TRANSLATIONS["ZH"].keys())
+    for lang in ("EN", "ES", "DE", "JA", "ZH", "PT"):
+        assert cles_fr == set(_TRANSLATIONS[lang].keys()), f"Clés manquantes ou en trop pour {lang}"
 
 def test_verifier_assertions_status_ok():
     """Un site retournant 200 doit valider status_code: 200."""
