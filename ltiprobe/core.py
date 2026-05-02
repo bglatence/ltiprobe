@@ -641,6 +641,77 @@ def mesurer_icmp(hostname, nb_mesures=5):
     except Exception:
         return None
 
+def decouvrir_path_mtu(hostname, mtu_max=1500, timeout=1):
+    """Découvre le Path MTU par dichotomie de sondes ICMP avec bit DF (Don't Fragment).
+
+    Utilise ping -D (macOS) ou ping -M do (Linux) — pas de raw socket requis.
+    Payload = MTU candidat - 28 octets (en-tête IP 20 + en-tête ICMP 8).
+
+    Retourne un dict :
+      mtu       : int | None  — Path MTU découvert en octets
+      sondages  : int         — nombre de sondes envoyées
+      blackhole : bool        — True si même les petits paquets DF échouent
+    Retourne None si ping ou la plateforme n'est pas supporté.
+    """
+    import platform
+
+    hostname = hostname.replace("https://", "").replace("http://", "").split("/")[0]
+    sys_name = platform.system()
+
+    def sonder(taille_mtu):
+        """Retourne True si un paquet de taille_mtu octets passe, False sinon, None si erreur."""
+        payload = taille_mtu - 28
+        if payload < 8:
+            return False
+        try:
+            if sys_name == "Darwin":
+                cmd = ["ping", "-D", "-s", str(payload), "-c", "1",
+                       "-W", str(int(timeout * 1000)), hostname]
+            elif sys_name == "Linux":
+                cmd = ["ping", "-M", "do", "-s", str(payload), "-c", "1",
+                       "-W", str(int(timeout)), hostname]
+            else:
+                return None
+            result = subprocess.run(
+                cmd, capture_output=True, text=True,
+                timeout=timeout + 2
+            )
+            return result.returncode == 0
+        except Exception:
+            return None
+
+    sondages = 0
+
+    # Test rapide au MTU standard
+    res = sonder(mtu_max)
+    sondages += 1
+    if res is None:
+        return None
+    if res:
+        return {"mtu": mtu_max, "sondages": sondages, "blackhole": False}
+
+    # Test au minimum pour détecter un blackhole PMTUD
+    mtu_min = 576
+    if not sonder(mtu_min):
+        sondages += 1
+        return {"mtu": None, "sondages": sondages, "blackhole": True}
+    sondages += 1
+
+    # Dichotomie entre mtu_min et mtu_max
+    lo, hi = mtu_min, mtu_max
+    mtu_trouve = mtu_min
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        res = sonder(mid)
+        sondages += 1
+        if res:
+            lo = mid
+            mtu_trouve = mid
+        else:
+            hi = mid
+
+    return {"mtu": mtu_trouve, "sondages": sondages, "blackhole": False}
+
 def mesurer_dns(hostname):
     """Mesure uniquement le temps de resolution DNS. Retourne ms ou None."""
     try:
