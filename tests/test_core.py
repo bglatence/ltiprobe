@@ -20,10 +20,17 @@ def test_i18n_langue_inconnue_repli_fr():
     t = get_translator("ZZ")
     assert "essais" in t("header", ver="0.3.0", n=5, cfg="ltiprobe.yaml")
 
+def test_i18n_es_header():
+    """Le traducteur ES doit produire un message en espagnol."""
+    t = get_translator("ES")
+    assert "intentos" in t("header", ver="0.3.0", n=5, cfg="ltiprobe.yaml")
+
 def test_i18n_cles_identiques():
-    """FR et EN doivent avoir exactement les mêmes clés."""
+    """FR, EN et ES doivent avoir exactement les mêmes clés."""
     from ltiprobe.i18n import _TRANSLATIONS
-    assert set(_TRANSLATIONS["FR"].keys()) == set(_TRANSLATIONS["EN"].keys())
+    cles_fr = set(_TRANSLATIONS["FR"].keys())
+    assert cles_fr == set(_TRANSLATIONS["EN"].keys())
+    assert cles_fr == set(_TRANSLATIONS["ES"].keys())
 
 def test_verifier_assertions_status_ok():
     """Un site retournant 200 doit valider status_code: 200."""
